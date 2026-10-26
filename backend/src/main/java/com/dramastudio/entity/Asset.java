@@ -9,8 +9,8 @@ public class Asset extends BaseEntity {
   @Column(name="asset_type",nullable=false) public String assetType;
   @Column(nullable=false) public String name;
   @Column(name="content_status",nullable=false) public String contentStatus="draft";
-  @Column(name="is_selected",nullable=false) public boolean selected;
-  @Column(name="is_locked",nullable=false) public boolean locked;
+  @Column(name="is_selected",nullable=false,columnDefinition="INTEGER") public boolean selected;
+  @Column(name="is_locked",nullable=false,columnDefinition="INTEGER") public boolean locked;
   @Column(name="content_text") public String contentText;
   @Column(name="storage_key") public String storageKey;
   @Column(name="thumbnail_key") public String thumbnailKey;
