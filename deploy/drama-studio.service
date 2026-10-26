@@ -1,0 +1,18 @@
+[Unit]
+Description=drama-studio backend (AI 短剧生成平台)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/drama-studio
+ExecStart=/usr/bin/java -jar /opt/drama-studio/backend/drama-studio.jar --server.port=18080
+Environment=SPRING_PROFILES_ACTIVE=prod
+# OAuth / OSS / 供应商凭证（部署时从环境注入）
+EnvironmentFile=/etc/drama-studio.env
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target
