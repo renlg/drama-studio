@@ -1,0 +1,8 @@
+package com.dramastudio.engine;
+import java.util.*; import org.springframework.jdbc.core.JdbcTemplate; import org.springframework.stereotype.Service;
+@Service public class GateService {
+ private final JdbcTemplate jdbc;public GateService(JdbcTemplate j){jdbc=j;}
+ public List<String> missing(String project,String type){var req=new ArrayList<String>();switch(type){case "STORY_OUTLINE"->approved(project,"PROJECT_STATE",req);case "CHARACTER_CARD"->{approved(project,"PROJECT_STATE",req);approved(project,"OUTLINE",req);}case "EPISODE_SCRIPT"->{approved(project,"OUTLINE",req);approved(project,"CHARACTER_CARD_LIST",req);}case "STORYBOARD_SCRIPT"->{approved(project,"EPISODE_SCRIPT",req);approved(project,"CHARACTER_CARD_LIST",req);}case "CHARACTER_REFERENCE_IMAGE"->approved(project,"CHARACTER_CARD_LIST",req);case "STORYBOARD_IMAGE"->{approved(project,"SHOT_CARD_LIST",req);selected(project,"CHARACTER_REFERENCE_IMAGE",req);}case "IMAGE_TO_VIDEO"->{selected(project,"STORYBOARD_IMAGE",req);approved(project,"VIDEO_PROMPT",req);}default->{}}return req;}
+ private void approved(String p,String type,List<String> out){Integer n=jdbc.queryForObject("select count(*) from assets where project_id=? and asset_type=? and content_status in ('approved','locked','selected') and deleted_at is null",Integer.class,p,type);if(n==null||n==0)out.add(type+" 需要 approved/locked");}
+ private void selected(String p,String type,List<String> out){Integer n=jdbc.queryForObject("select count(*) from assets where project_id=? and asset_type=? and (is_selected=1 or content_status='locked') and deleted_at is null",Integer.class,p,type);if(n==null||n==0)out.add(type+" 需要 selected/locked");}
+}

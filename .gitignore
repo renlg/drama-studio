@@ -1,0 +1,11 @@
+backend/target/
+backend/data/
+*.db
+*.db-shm
+*.db-wal
+web/node_modules/
+web/dist/
+.DS_Store
+.env
+.env.*
+!.env.example

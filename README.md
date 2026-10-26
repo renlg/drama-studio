@@ -36,8 +36,16 @@ npm run dev
 
 ## 配置
 
-- 后端配置：`backend/src/main/resources/application.yml`（OAuth client_id/secret、OSS 凭证、供应商 Key）
-- 数据库：SQLite 单文件 `backend/data/drama-studio.db`
+- 按 `.env.example` 注入 OAuth/JWT/OSS 凭证，代码和配置文件不保存密钥。
+- 数据库：SQLite 单文件 `backend/data/drama-studio.db`，启用 WAL、外键和 5 秒 busy timeout。
+- 未配置 OSS 时签名接口返回 503；本地执行默认使用 `MOCK_CLOUD` 适配器，生产供应商实现统一 Adapter 后替换。
+
+## 验证
+
+```bash
+cd backend && mvn test
+cd web && npm run build
+```
 
 ## 文档
 
