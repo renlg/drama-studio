@@ -10,3 +10,8 @@ web/dist/
 .env.*
 !.env.example
 *.tsbuildinfo
+
+# tsc 编译产物（会导致 vite 加载错误配置）
+web/vite.config.js
+web/vite.config.d.ts
+*.tsbuildinfo
