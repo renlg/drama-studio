@@ -42,10 +42,11 @@ public class PromptBuilder {
             .replace("\"", "")).append("。");
       }
       if (p.description != null && !p.description.isBlank()) {
-        sb.append("故事梗概：").append(p.description).append("。");
+        // 26s 渠道硬超时：梗概截断，否则 ctx 就吃掉大半预算。
+        sb.append("故事梗概：").append(truncate(p.description, 150)).append("。");
       }
       if (p.storyEnvironment != null && !p.storyEnvironment.isBlank()) {
-        sb.append("故事环境：").append(p.storyEnvironment).append("。");
+        sb.append("故事环境：").append(truncate(p.storyEnvironment, 60)).append("。");
       }
       sb.append("类型：").append(p.dramaType).append("，画风：").append(p.artStyle).append("。");
       sb.append("总集数=").append(p.episodeCount).append("，单集时长=")
@@ -92,13 +93,13 @@ public class PromptBuilder {
       case "EPISODE_SCRIPT" -> {
         String outline = latestTextOf(projectId, "OUTLINE");
         String chars = latestTextOf(projectId, "CHARACTER_CARD_LIST");
+        // 26s 渠道硬超时：上下文与输出都必须压到很小，否则必 502。
         yield ctx
-            + (outline.isBlank() ? "" : "\n【故事大纲】\n" + truncate(outline, 1000))
-            + (chars.isBlank() ? "" : "\n【角色设定】\n" + truncate(chars, 800))
-            + "\n请撰写第 " + num(config, "episode_number", 1) + " 集剧本。"
-            + "时长约 " + num(config, "episode_duration_sec", 90) + " 秒。"
-            + "输出：场景标题 + 对白 + 关键动作，前5秒抓住注意力，结尾留强钩子。"
-            + "总字数严格控制在800字以内。";
+            + (outline.isBlank() ? "" : "\n【大纲】\n" + truncate(outline, 350))
+            + (chars.isBlank() ? "" : "\n【角色】\n" + truncate(chars, 250))
+            + "\n写第 " + num(config, "episode_number", 1) + " 集剧本。"
+            + "输出：场景标题 + 简短对白 + 关键动作，开头抓注意力，结尾留钩子。"
+            + "总字数不超过350字，不要解释不要标题党。";
       }
 
       case "EPISODE_SPLITTER" -> {
@@ -124,10 +125,12 @@ public class PromptBuilder {
 
       case "STORYBOARD_SCRIPT" -> {
         String script = latestTextOf(projectId, "EPISODE_SCRIPT");
-        yield ctx + (script.isBlank() ? "" : "\n【本集剧本】\n" + truncate(script, 1500))
-            + "\n请拆分为分镜表，每个镜头一行：镜号｜景别｜画面描述｜对白｜时长(3-6秒)。"
-            + "镜头数=" + num(config, "shot_count", 20) + "。"
-            + "画面描述不超过20字，总字数控制在800字以内。";
+        // 26s 渠道硬超时：镜头数必须小。实测 20 镜头 x 5 字段一次生成必 502。
+        int shots = Math.min(num(config, "shot_count", 6), 8);
+        yield ctx + (script.isBlank() ? "" : "\n【本集剧本】\n" + truncate(script, 400))
+            + "\n拆分为分镜表，每行一个镜头，格式：镜号｜景别｜画面描述｜对白｜时长。"
+            + "镜头数=" + shots + "。"
+            + "画面描述不超过12字，对白不超过10字，总字数不超过300字，不要任何解释。";
       }
 
       case "CHARACTER_REFERENCE_IMAGE" -> {
