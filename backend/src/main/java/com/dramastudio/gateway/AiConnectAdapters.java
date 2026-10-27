@@ -55,6 +55,10 @@ public class AiConnectAdapters {
   @Value("${app.aiconnect.video-model:video-free}")
   private String videoModel;
 
+  /** 视频提交队列满时的最大重试次数（上游免费队列常年拥堵）。 */
+  @Value("${app.aiconnect.video-max-queue-retries:4}")
+  private int maxQueueRetries;
+
   private HttpClient http() {
     return HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(20))
@@ -285,20 +289,50 @@ public class AiConnectAdapters {
                 ProviderProtocol.ErrorCode.CONTENT_REJECTED, "图生视频缺少同分集分镜图");
           }
           String mode = Objects.toString(r.params().get("mode"), "").trim();
-          if (mode.isBlank()) {
-            throw new ProviderProtocol.ProviderException(
-                ProviderProtocol.ErrorCode.PROVIDER_TIMEOUT,
-                "视频通道当前不可用：尚未探测到 video 组接受的 mode 值");
-          }
+          if (mode.isBlank()) mode = "keyframe";
           double requested = r.params().get("duration_sec") instanceof Number n ? n.doubleValue() : 5;
           int duration = (int) Math.round(Math.max(4, Math.min(12, requested)));
-          body.put("size", "720p");
-          body.put("duration", duration);
+          // 依据 wiki.agnes-ai.com/zh-Hans/docs/agnes-video-25-flash：
+          //  - size 只能是字符串 "720P"（大写 P，Flash 不支持 480P/1080P/4k）
+          //  - seconds 必须是正整数（文档写字符串，但中转层要求整数）
+          //  - mode=keyframe 用 first_frame；mode=reference 用 images 数组
+          //  - 画幅由 aspect_ratio 控制，9:16 -> 720x1280
+          body.put("size", "720P");
+          body.put("seconds", duration);
           body.put("mode", mode);
-          body.put("image", r.referenceImageUrls().get(0));
+          body.put("aspect_ratio", Objects.toString(r.params().get("aspect_ratio"), "9:16"));
+          if ("reference".equals(mode)) {
+            body.put("images", r.referenceImageUrls().subList(0, Math.min(5, r.referenceImageUrls().size())));
+          } else {
+            body.put("first_frame", r.referenceImageUrls().get(0));
+          }
 
-          JsonNode node = post("/videos/generations", body, Duration.ofMinutes(2));
-          String id = node.path("id").asText(node.path("task_id").asText(""));
+          // 上游免费队列常年 video_queue_full，需要长退避重试才有机会排进去。
+          JsonNode node = null;
+          Exception last = null;
+          for (int attempt = 1; attempt <= maxQueueRetries; attempt++) {
+            try {
+              node = post("/videos", body, Duration.ofMinutes(2));
+              last = null;
+              break;
+            } catch (Exception e) {
+              last = e;
+              String msg = String.valueOf(e.getMessage());
+              boolean queueFull = msg.contains("video_queue_full") || msg.contains("队列已满");
+              log.warn("视频提交第 {}/{} 次失败（queueFull={}）: {}", attempt, maxQueueRetries, queueFull, msg);
+              if (attempt == maxQueueRetries) break;
+              // 队列满退避更久：30s, 60s, 120s...；其它错误 10s 起。
+              long backoffSec = queueFull ? Math.min(300L, 30L * (1L << (attempt - 1))) : 10L * attempt;
+              Thread.sleep(backoffSec * 1000L);
+            }
+          }
+          if (node == null) {
+            throw new ProviderProtocol.ProviderException(
+                ProviderProtocol.ErrorCode.PROVIDER_TIMEOUT,
+                "视频提交失败（已重试 " + maxQueueRetries + " 次）: "
+                    + (last == null ? "unknown" : last.getMessage()));
+          }
+          String id = node.path("video_id").asText(node.path("id").asText(node.path("task_id").asText("")));
           if (id.isBlank()) {
             throw new ProviderProtocol.ProviderException(
                 ProviderProtocol.ErrorCode.CONTENT_REJECTED, "视频任务无 id 返回: " + node);
