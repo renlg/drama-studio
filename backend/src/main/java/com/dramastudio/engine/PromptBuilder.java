@@ -63,34 +63,39 @@ public class PromptBuilder {
     String ctx = projectContext(projectId, config);
     return switch (nodeType) {
       case "STORY_OUTLINE" -> ctx
-          + "请为以上短剧创作完整故事大纲。要求："
+          + "请为以上短剧创作故事大纲。要求："
           + "分集数=" + num(config, "episode_count", 10) + "，"
           + "单集时长=" + num(config, "episode_duration_sec", 90) + "秒。"
-          + "输出：核心冲突、人物关系、每集梗概与钩子。语言简洁中文。";
+          + "输出三部分：核心冲突（3条）、主要人物关系（4人）、"
+          + "每集一句梗概+一个钩子（每条不超过25字）。"
+          + "极度精简，总字数严格控制在800字以内，不要展开描写。";
 
       case "CHARACTER_CARD" -> {
         String outline = latestTextOf(projectId, "OUTLINE");
-        yield ctx + (outline.isBlank() ? "" : "\n【故事大纲】\n" + truncate(outline, 2000))
-            + "\n请设计主要角色卡片。每个角色包含：姓名、年龄、身份、性格、外貌特征、人物弧光。"
-            + "角色数量=" + num(config, "character_count", 4) + "。";
+        yield ctx + (outline.isBlank() ? "" : "\n【故事大纲】\n" + truncate(outline, 1200))
+            + "\n请设计主要角色卡片，每位角色一行字段：姓名｜年龄｜身份｜性格关键词｜外貌要点。"
+            + "角色数量=" + num(config, "character_count", 4) + "。"
+            + "每位不超过100字，总字数控制在800字以内。";
       }
 
       case "EPISODE_SCRIPT" -> {
         String outline = latestTextOf(projectId, "OUTLINE");
         String chars = latestTextOf(projectId, "CHARACTER_CARD_LIST");
         yield ctx
-            + (outline.isBlank() ? "" : "\n【故事大纲】\n" + truncate(outline, 1500))
-            + (chars.isBlank() ? "" : "\n【角色设定】\n" + truncate(chars, 1500))
-            + "\n请撰写第 " + num(config, "episode_number", 1) + " 集完整剧本。"
-            + "时长约 " + num(config, "episode_duration_sec", 90) + " 秒，"
-            + "包含场景、对白、动作描写。短剧节奏：前 5 秒必须抓住注意力，结尾留强钩子。";
+            + (outline.isBlank() ? "" : "\n【故事大纲】\n" + truncate(outline, 1000))
+            + (chars.isBlank() ? "" : "\n【角色设定】\n" + truncate(chars, 800))
+            + "\n请撰写第 " + num(config, "episode_number", 1) + " 集剧本。"
+            + "时长约 " + num(config, "episode_duration_sec", 90) + " 秒。"
+            + "输出：场景标题 + 对白 + 关键动作，前5秒抓住注意力，结尾留强钩子。"
+            + "总字数严格控制在800字以内。";
       }
 
       case "STORYBOARD_SCRIPT" -> {
         String script = latestTextOf(projectId, "EPISODE_SCRIPT");
-        yield ctx + (script.isBlank() ? "" : "\n【本集剧本】\n" + truncate(script, 2500))
-            + "\n请拆分为分镜表。每个镜头包含：镜号、景别、画面描述、对白、时长（3-6秒）。"
-            + "镜头数=" + num(config, "shot_count", 20) + "。";
+        yield ctx + (script.isBlank() ? "" : "\n【本集剧本】\n" + truncate(script, 1500))
+            + "\n请拆分为分镜表，每个镜头一行：镜号｜景别｜画面描述｜对白｜时长(3-6秒)。"
+            + "镜头数=" + num(config, "shot_count", 20) + "。"
+            + "画面描述不超过20字，总字数控制在800字以内。";
       }
 
       case "CHARACTER_REFERENCE_IMAGE" -> {

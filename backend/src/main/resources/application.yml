@@ -31,7 +31,7 @@ app:
   aiconnect:
     base-url: ${AI_CONNECT_BASE_URL:https://ai-connect.top/v1}
     api-key: ${AI_CONNECT_SK:}
-    llm-model: ${AI_CONNECT_LLM_MODEL:free}
+    llm-model: ${AI_CONNECT_LLM_MODEL:hermes-token}
     image-model: ${AI_CONNECT_IMAGE_MODEL:image-free}
     video-model: ${AI_CONNECT_VIDEO_MODEL:video-free}
 logging.level.org.hibernate.SQL: WARN

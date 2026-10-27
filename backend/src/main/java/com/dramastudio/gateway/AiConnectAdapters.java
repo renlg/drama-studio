@@ -37,8 +37,14 @@ public class AiConnectAdapters {
   @Value("${app.aiconnect.api-key:}")
   private String apiKey;
 
-  @Value("${app.aiconnect.llm-model:free}")
+  @Value("${app.aiconnect.llm-model:hermes-token}")
   private String llmModel;
+
+  /** 系统提示：抑制推理模型的思考发散，直出成品。 */
+  private static final String SYSTEM_PROMPT =
+      "你是资深短剧编剧。严格按用户要求直接输出成品内容，"
+          + "不要复述需求、不要解释思路、不要输出思考过程、不要说「您未提供」。"
+          + "中文输出，结构清晰，可直接用于拍摄。";
 
   @Value("${app.aiconnect.image-model:image-free}")
   private String imageModel;
@@ -112,15 +118,26 @@ public class AiConnectAdapters {
         try {
           Map<String, Object> body = new LinkedHashMap<>();
           body.put("model", llmModel);
-          body.put("messages", List.of(Map.of("role", "user", "content", r.prompt())));
+          body.put("messages", List.of(
+              Map.of("role", "system", "content", SYSTEM_PROMPT),
+              Map.of("role", "user", "content", r.prompt())));
+          // 推理型模型（deepseek-v4.x）会先消耗 reasoning token，
+          // max_tokens 太小会导致 content 为空，因此给足额度。
           Object mt = r.params() == null ? null : r.params().get("max_tokens");
-          body.put("max_tokens", mt instanceof Number ? ((Number) mt).intValue() : 4096);
+          body.put("max_tokens", mt instanceof Number ? ((Number) mt).intValue() : 8192);
 
-          JsonNode node = post("/chat/completions", body, Duration.ofMinutes(5));
-          String text = node.path("choices").path(0).path("message").path("content").asText("");
+          JsonNode node = post("/chat/completions", body, Duration.ofMinutes(8));
+          JsonNode choice = node.path("choices").path(0);
+          String text = choice.path("message").path("content").asText("");
           if (text.isBlank()) {
+            // 空正文多为 reasoning 占满额度，把推理内容回传便于排查，而不是直接失败
+            String reasoning = choice.path("message").path("reasoning_content").asText("");
+            String finish = choice.path("finish_reason").asText("");
             throw new ProviderProtocol.ProviderException(
-                ProviderProtocol.ErrorCode.CONTENT_REJECTED, "ai-connect 返回空内容");
+                ProviderProtocol.ErrorCode.CONTENT_REJECTED,
+                "ai-connect 返回空内容 (finish_reason=" + finish
+                    + ", usage=" + node.path("usage")
+                    + ", reasoning=" + (reasoning.isBlank() ? "无" : reasoning.substring(0, Math.min(200, reasoning.length()))) + ")");
           }
           Map<String, Object> raw = new LinkedHashMap<>();
           raw.put("text", text);
