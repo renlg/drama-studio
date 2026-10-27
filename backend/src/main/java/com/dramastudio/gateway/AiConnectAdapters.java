@@ -200,8 +200,9 @@ public class AiConnectAdapters {
           List<String> refs = r.referenceImageUrls();
           body.put("model", refs.isEmpty() ? imageModel : imageToImageModel);
           body.put("prompt", r.prompt());
-          Object count = r.params() == null ? null : r.params().get("output_count");
-          body.put("n", count instanceof Number ? Math.max(1, ((Number) count).intValue()) : 1);
+          // ai-connect 图片接口强制 n=1（实测传 n>1 直接 400 "n 必须为 1"）。
+          // output_count 由外层循环多次调用实现，这里恒传 1。
+          body.put("n", 1);
           String size = "1024x1024";
           if (r.params() != null) {
             Object s = r.params().get("size");
