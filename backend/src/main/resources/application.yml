@@ -28,4 +28,10 @@ app:
     access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
     bucket: ${OSS_BUCKET:}
     endpoint: ${OSS_ENDPOINT:}
+  aiconnect:
+    base-url: ${AI_CONNECT_BASE_URL:https://ai-connect.top/v1}
+    api-key: ${AI_CONNECT_SK:}
+    llm-model: ${AI_CONNECT_LLM_MODEL:free}
+    image-model: ${AI_CONNECT_IMAGE_MODEL:image-free}
+    video-model: ${AI_CONNECT_VIDEO_MODEL:video-free}
 logging.level.org.hibernate.SQL: WARN

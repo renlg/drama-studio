@@ -3,5 +3,6 @@ import com.dramastudio.entity.Asset; import java.util.*; import org.springframew
 public interface AssetRepository extends JpaRepository<Asset,String>{
  List<Asset> findByProjectIdAndDeletedAtIsNullOrderByCreatedAtDesc(String projectId);
  Optional<Asset> findFirstByProjectIdAndLogicalKeyOrderByVersionNoDesc(String p,String k);
+ Optional<Asset> findFirstByProjectIdAndAssetTypeOrderByVersionNoDesc(String p,String assetType);
  @Modifying @Query("update Asset a set a.selected=false where a.projectId=:p and a.logicalKey=:k") int clearSelection(@Param("p") String p,@Param("k") String k);
 }
