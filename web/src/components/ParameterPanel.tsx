@@ -2,6 +2,7 @@ import {Empty,Form,Input,InputNumber,Select,Switch,Tabs,Typography,Tag} from 'an
 import {useWorkflow} from '../store/workflow';
 import {useCatalog,paramLabel} from '../store/catalog';
 import type {CatalogDef,CatalogParam} from '../store/catalog';
+import {EpisodeAssetsOutput} from './EpisodeOverviewNode';
 
 type Row=[string,CatalogParam|undefined,unknown];
 
@@ -93,7 +94,7 @@ export default function ParameterPanel(){
           {key:'user',label:`用户 (${userRows.length})`,children:userRows.length?renderGroup(userRows):<Empty description="无用户参数"/>},
           {key:'upstream',label:`上游 (${upRows.length})`,children:upRows.length?renderGroup(upRows):<Empty description="无上游参数"/>},
           {key:'default',label:`默认 (${defRows.length})`,children:defRows.length?renderGroup(defRows):<Empty description="无默认参数"/>},
-          {key:'output',label:'输出',children:<Empty description="运行后在此查看输出"/>},
+          {key:'output',label:'输出',children:n.type==='EPISODE_OVERVIEW'?<EpisodeAssetsOutput episodeNumber={Number(config.episode_number)||1} autoRefresh={config.auto_refresh!==false}/>:<Empty description="运行后在此查看输出"/>},
           {key:'history',label:'历史',children:<Empty description="暂无历史"/>},
         ]}
       />

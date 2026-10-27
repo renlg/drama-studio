@@ -82,6 +82,7 @@ export const PARAM_LABELS: Record<string, string> = {
   prop_policy: '道具策略',
   forbidden_changes: '禁止变更项',
   episode_number: '集数编号',
+  auto_refresh: '自动刷新',
   episode_title: '分集标题',
   target_duration_sec: '目标时长(秒)',
   dialogue_ratio: '对白占比',
