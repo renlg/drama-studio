@@ -31,19 +31,19 @@ public class AiConnectAdapters {
 
   private static final Logger log = LoggerFactory.getLogger(AiConnectAdapters.class);
 
-  @Value("${drama.aiconnect.base-url:https://ai-connect.top/v1}")
+  @Value("${app.aiconnect.base-url:https://ai-connect.top/v1}")
   private String baseUrl;
 
-  @Value("${drama.aiconnect.api-key:}")
+  @Value("${app.aiconnect.api-key:}")
   private String apiKey;
 
-  @Value("${drama.aiconnect.llm-model:free}")
+  @Value("${app.aiconnect.llm-model:free}")
   private String llmModel;
 
-  @Value("${drama.aiconnect.image-model:image-free}")
+  @Value("${app.aiconnect.image-model:image-free}")
   private String imageModel;
 
-  @Value("${drama.aiconnect.video-model:video-free}")
+  @Value("${app.aiconnect.video-model:video-free}")
   private String videoModel;
 
   private HttpClient http() {
