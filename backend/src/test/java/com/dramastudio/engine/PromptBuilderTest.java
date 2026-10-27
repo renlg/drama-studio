@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.dramastudio.entity.Project;
 import com.dramastudio.repository.AssetRepository;
 import com.dramastudio.repository.ProjectRepository;
+import com.dramastudio.storage.OssStorageService;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -20,7 +21,7 @@ class PromptBuilderTest {
         Mockito.anyString(), Mockito.anyString())).thenReturn(Optional.empty());
     ProjectRepository projects = Mockito.mock(ProjectRepository.class);
     Mockito.when(projects.findById(Mockito.anyString())).thenReturn(Optional.ofNullable(p));
-    return new PromptBuilder(assets, projects);
+    return new PromptBuilder(assets, projects, Mockito.mock(OssStorageService.class));
   }
 
   private Project sample() {
@@ -56,5 +57,15 @@ class PromptBuilderTest {
     String prompt = builder(null).build("STORY_OUTLINE",
         Map.of("title", "回退剧名"), "pid");
     assertTrue(prompt.contains("回退剧名"));
+  }
+
+  @Test
+  void 分集拆解提示词强制短JSON并支持批次() {
+    String prompt = builder(sample()).build("EPISODE_SPLITTER",
+        Map.of("episode_count", 10, "batch_start", 6, "batch_end", 10), "pid");
+    assertTrue(prompt.contains("第6至10集"));
+    assertTrue(prompt.contains("synopsis不超过40个汉字"));
+    assertTrue(prompt.contains("hook不超过20个汉字"));
+    assertTrue(prompt.contains("严格 JSON"));
   }
 }

@@ -4,6 +4,8 @@ import com.dramastudio.entity.Asset;
 import com.dramastudio.entity.Project;
 import com.dramastudio.repository.AssetRepository;
 import com.dramastudio.repository.ProjectRepository;
+import com.dramastudio.storage.OssStorageService;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -19,10 +21,12 @@ public class PromptBuilder {
 
   private final AssetRepository assets;
   private final ProjectRepository projects;
+  private final OssStorageService storage;
 
-  public PromptBuilder(AssetRepository assets, ProjectRepository projects) {
+  public PromptBuilder(AssetRepository assets, ProjectRepository projects, OssStorageService storage) {
     this.assets = assets;
     this.projects = projects;
+    this.storage = storage;
   }
 
   /** 项目级公共设定（来自 projects 表，不再依赖节点 config）。 */
@@ -90,6 +94,27 @@ public class PromptBuilder {
             + "总字数严格控制在800字以内。";
       }
 
+      case "EPISODE_SPLITTER" -> {
+        String outline = latestTextOf(projectId, "OUTLINE");
+        int total = num(config, "episode_count", 10);
+        int from = num(config, "batch_start", 1);
+        int to = num(config, "batch_end", total);
+        yield ctx + (outline.isBlank() ? "" : "\n【大纲】\n" + truncate(outline, 1200))
+            + "\n把大纲拆为第" + from + "至" + to + "集（总计" + total + "集），策略="
+            + str(config.getOrDefault("split_strategy", "按大纲")) + "。"
+            + "只输出严格 JSON 数组，不要 markdown。每项仅含 episode_number,title,synopsis,hook,target_duration_sec；"
+            + "synopsis不超过40个汉字，hook不超过20个汉字，target_duration_sec="
+            + num(config, "episode_duration_sec", 90) + "。";
+      }
+
+      case "SCENE_PROP_CARD" -> {
+        String outline = latestTextOf(projectId, "OUTLINE");
+        String script = latestTextOf(projectId, "EPISODE_SCRIPT");
+        yield ctx + "\n【大纲】" + truncate(outline, 1000) + "\n【剧本】" + truncate(script, 1000)
+            + "\n提取场景和关键道具。只输出严格JSON对象：{\"scenes\":[],\"props\":[]}。"
+            + "每类最多8项，每项为不超过30字的字符串，不要解释。";
+      }
+
       case "STORYBOARD_SCRIPT" -> {
         String script = latestTextOf(projectId, "EPISODE_SCRIPT");
         yield ctx + (script.isBlank() ? "" : "\n【本集剧本】\n" + truncate(script, 1500))
@@ -111,6 +136,14 @@ public class PromptBuilder {
             + "\n请按分镜表逐镜生成画面。电影感构图，写实风格，光线氛围与剧情一致，无文字无水印。";
       }
 
+      case "SCENE_REFERENCE_IMAGE" -> ctx + "\n生成场景设定参考图。"
+          + str(config.getOrDefault("background", "场景完整，无人物")) + "；"
+          + str(config.getOrDefault("composition", "电影感广角构图")) + "；无文字无水印。";
+
+      case "PROP_REFERENCE_IMAGE" -> ctx + "\n生成关键道具设定参考图。"
+          + str(config.getOrDefault("background", "纯白背景")) + "；"
+          + str(config.getOrDefault("composition", "产品设定图，多角度")) + "；无人物、无文字、无水印。";
+
       case "IMAGE_TO_VIDEO" -> {
         Object prompt = config.get("motion_prompt");
         yield (prompt == null || String.valueOf(prompt).isBlank()
@@ -121,6 +154,41 @@ public class PromptBuilder {
 
       default -> ctx + nodeType;
     };
+  }
+
+  /** 显式资产引用 + 节点约定的自动引用，统一转换成供应商可下载 24 小时 OSS URL。 */
+  public List<String> resolveReferenceImages(String projectId, String nodeType, Map<String, Object> config) {
+    LinkedHashMap<String, Asset> resolved = new LinkedHashMap<>();
+    for (String key : List.of("reference_images", "character_refs", "scene_assets", "source_image")) {
+      collectRefs(config.get(key), resolved);
+    }
+    if (nodeType.equals("STORYBOARD_IMAGE")) {
+      collectSelected(projectId, "CHARACTER_REFERENCE_IMAGE", resolved, config);
+      collectSelected(projectId, "SCENE_REFERENCE_IMAGE", resolved, config);
+    } else if (nodeType.equals("IMAGE_TO_VIDEO")) {
+      collectSelected(projectId, "STORYBOARD_IMAGE", resolved, config);
+    }
+    return resolved.values().stream().filter(a -> a.storageKey != null && !a.storageKey.isBlank())
+        .map(a -> storage.presignGet(a.storageKey, Duration.ofHours(24))).toList();
+  }
+
+  private void collectSelected(String projectId,String type,LinkedHashMap<String,Asset> out,Map<String,Object> config){
+    int episode=num(config,"episode_number",0);
+    for(Asset a:assets.findByProjectIdAndAssetTypeAndDeletedAtIsNullOrderByCreatedAtDesc(projectId,type)){
+      if(!(a.selected||a.locked))continue;
+      if(episode>0&&!sameEpisode(a,episode))continue;
+      out.putIfAbsent(a.id,a);
+    }
+  }
+  private boolean sameEpisode(Asset a,int episode){
+    if(a.logicalKey!=null&&(a.logicalKey.contains(":"+episode+":")||a.logicalKey.endsWith(":"+episode)))return true;
+    return a.metadataJson!=null&&a.metadataJson.matches("(?s).*\\\"episode_number\\\"\\s*:\\s*"+episode+"(?:\\D.*|$)");
+  }
+  private void collectRefs(Object value,LinkedHashMap<String,Asset> out){
+    if(value==null)return;
+    if(value instanceof Collection<?> c){c.forEach(x->collectRefs(x,out));return;}
+    if(value instanceof Map<?,?> m){collectRefs(m.get("id"),out);return;}
+    assets.findById(String.valueOf(value)).filter(a->a.deletedAt==null).ifPresent(a->out.putIfAbsent(a.id,a));
   }
 
   private static String truncate(String s, int n) {

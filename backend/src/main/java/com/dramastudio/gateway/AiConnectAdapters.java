@@ -49,6 +49,9 @@ public class AiConnectAdapters {
   @Value("${app.aiconnect.image-model:image-free}")
   private String imageModel;
 
+  @Value("${app.aiconnect.image-to-image-model:hermes-image}")
+  private String imageToImageModel;
+
   @Value("${app.aiconnect.video-model:video-free}")
   private String videoModel;
 
@@ -74,6 +77,7 @@ public class AiConnectAdapters {
       throw new ProviderProtocol.ProviderException(
           resp.statusCode() == 401 ? ProviderProtocol.ErrorCode.PROVIDER_AUTH_FAILED
               : resp.statusCode() == 429 ? ProviderProtocol.ErrorCode.PROVIDER_RATE_LIMITED
+              : resp.statusCode() == 408 || resp.statusCode() >= 500 ? ProviderProtocol.ErrorCode.PROVIDER_TIMEOUT
               : ProviderProtocol.ErrorCode.CONTENT_REJECTED,
           "ai-connect HTTP " + resp.statusCode() + ": " + msg);
     }
@@ -193,15 +197,22 @@ public class AiConnectAdapters {
       public ProviderProtocol.Submission submit(ProviderProtocol.Request r) {
         try {
           Map<String, Object> body = new LinkedHashMap<>();
-          body.put("model", imageModel);
+          List<String> refs = r.referenceImageUrls();
+          body.put("model", refs.isEmpty() ? imageModel : imageToImageModel);
           body.put("prompt", r.prompt());
-          body.put("n", 1);
+          Object count = r.params() == null ? null : r.params().get("output_count");
+          body.put("n", count instanceof Number ? Math.max(1, ((Number) count).intValue()) : 1);
           String size = "1024x1024";
           if (r.params() != null) {
             Object s = r.params().get("size");
             if (s != null && !String.valueOf(s).isBlank()) size = String.valueOf(s);
+            else if (r.params().get("width") instanceof Number w && r.params().get("height") instanceof Number h)
+              size = w.intValue() + "x" + h.intValue();
           }
           body.put("size", size);
+          if (!refs.isEmpty()) {
+            body.put("image", refs.size() == 1 ? refs.get(0) : refs);
+          }
 
           JsonNode node = post("/images/generations", body, Duration.ofMinutes(5));
           JsonNode first = node.path("data").path(0);
@@ -268,8 +279,22 @@ public class AiConnectAdapters {
           Map<String, Object> body = new LinkedHashMap<>();
           body.put("model", videoModel);
           body.put("prompt", r.prompt());
-          body.put("size", "480p");
-          body.put("duration", 5);
+          if (r.referenceImageUrls().isEmpty()) {
+            throw new ProviderProtocol.ProviderException(
+                ProviderProtocol.ErrorCode.CONTENT_REJECTED, "图生视频缺少同分集分镜图");
+          }
+          String mode = Objects.toString(r.params().get("mode"), "").trim();
+          if (mode.isBlank()) {
+            throw new ProviderProtocol.ProviderException(
+                ProviderProtocol.ErrorCode.PROVIDER_TIMEOUT,
+                "视频通道当前不可用：尚未探测到 video 组接受的 mode 值");
+          }
+          double requested = r.params().get("duration_sec") instanceof Number n ? n.doubleValue() : 5;
+          int duration = (int) Math.round(Math.max(4, Math.min(12, requested)));
+          body.put("size", "720p");
+          body.put("duration", duration);
+          body.put("mode", mode);
+          body.put("image", r.referenceImageUrls().get(0));
 
           JsonNode node = post("/videos/generations", body, Duration.ofMinutes(2));
           String id = node.path("id").asText(node.path("task_id").asText(""));
