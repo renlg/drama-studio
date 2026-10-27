@@ -1,36 +1,51 @@
 package com.dramastudio.engine;
 
 import com.dramastudio.entity.Asset;
+import com.dramastudio.entity.Project;
 import com.dramastudio.repository.AssetRepository;
+import com.dramastudio.repository.ProjectRepository;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
- * 把节点配置 + 上游产出组装成真实可用的提示词。
+ * 把项目设定 + 节点配置 + 上游产出组装成真实可用的提示词。
  *
- * 全云端 API 模式下，prompt 质量直接决定产出质量：
- * 上游节点（大纲/剧本/分镜）的文本会被注入下游节点，保证风格与剧情连贯。
+ * 全云端 API 模式下，prompt 质量直接决定产出质量：项目题材/梗概与上游节点
+ * （大纲/剧本/分镜）的文本都会注入下游，保证风格与剧情连贯。
  */
 @Component
 public class PromptBuilder {
 
   private final AssetRepository assets;
+  private final ProjectRepository projects;
 
-  public PromptBuilder(AssetRepository assets) {
+  public PromptBuilder(AssetRepository assets, ProjectRepository projects) {
     this.assets = assets;
+    this.projects = projects;
   }
 
-  /** 项目级公共设定，注入所有节点，保证风格统一。 */
-  @SuppressWarnings("unchecked")
-  private String projectContext(Map<String, Object> config) {
+  /** 项目级公共设定（来自 projects 表，不再依赖节点 config）。 */
+  private String projectContext(String projectId, Map<String, Object> config) {
     StringBuilder sb = new StringBuilder();
-    String title = str(config.get("title"));
+    Project p = projects.findById(projectId).orElse(null);
+    String title = p != null && p.name != null ? p.name : str(config.get("title"));
     if (!title.isBlank()) sb.append("剧名《").append(title).append("》。");
-    Object genres = config.get("genres");
-    if (genres instanceof List<?> l && !l.isEmpty()) {
-      sb.append("题材：").append(l.stream().map(String::valueOf)
-          .collect(Collectors.joining("、"))).append("。");
+    if (p != null) {
+      String genres = p.genresJson;
+      if (genres != null && genres.length() > 2) {
+        sb.append("题材：").append(genres.replace("[", "").replace("]", "")
+            .replace("\"", "")).append("。");
+      }
+      if (p.description != null && !p.description.isBlank()) {
+        sb.append("故事梗概：").append(p.description).append("。");
+      }
+      if (p.storyEnvironment != null && !p.storyEnvironment.isBlank()) {
+        sb.append("故事环境：").append(p.storyEnvironment).append("。");
+      }
+      sb.append("类型：").append(p.dramaType).append("，画风：").append(p.artStyle).append("。");
+      sb.append("总集数=").append(p.episodeCount).append("，单集时长=")
+          .append(p.episodeDurationSec).append("秒。");
     }
     String logline = str(config.get("logline"));
     if (!logline.isBlank()) sb.append("一句话故事：").append(logline).append("。");
@@ -45,7 +60,7 @@ public class PromptBuilder {
   }
 
   public String build(String nodeType, Map<String, Object> config, String projectId) {
-    String ctx = projectContext(config);
+    String ctx = projectContext(projectId, config);
     return switch (nodeType) {
       case "STORY_OUTLINE" -> ctx
           + "请为以上短剧创作完整故事大纲。要求："
