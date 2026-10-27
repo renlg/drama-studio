@@ -66,6 +66,13 @@ public class PromptBuilder {
   public String build(String nodeType, Map<String, Object> config, String projectId) {
     String ctx = projectContext(projectId, config);
     return switch (nodeType) {
+      // 项目设定节点：把用户设定整理成结构化项目状态。
+      // 必须显式处理，否则会落进 default 发无意义 prompt（实测必 502 超时）。
+      case "PROJECT_SETUP" -> ctx
+          + "请把以上信息整理为项目设定卡。输出：题材/画风/类型/受众各一行，"
+          + "核心卖点2条，主角设定1段（不超过60字），全剧爽点节奏1段（不超过60字）。"
+          + "极度精简，总字数严格控制在400字以内，不要重复原文。";
+
       case "STORY_OUTLINE" -> ctx
           + "请为以上短剧创作故事大纲。要求："
           + "分集数=" + num(config, "episode_count", 10) + "，"
