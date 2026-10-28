@@ -23,6 +23,24 @@ import com.aliyun.oss.*; import com.aliyun.oss.model.GeneratePresignedUrlRequest
   try(InputStream in=oss.getObject(bucket,objectKey).getObjectContent()){Files.copy(in,target,StandardCopyOption.REPLACE_EXISTING);}
   catch(Exception e){throw new IllegalStateException("OSS 文件下载失败: "+e.getMessage(),e);}finally{oss.shutdown();}
  }
+ public InputStream openStream(String objectKey){
+  requireConfigured();
+  OSS oss=new OSSClientBuilder().build(endpoint,key,secret);
+  try{
+   InputStream content=oss.getObject(bucket,objectKey).getObjectContent();
+   return new FilterInputStream(content){
+    private boolean closed;
+    @Override public void close()throws IOException{
+     if(closed)return;
+     closed=true;
+     try{super.close();}finally{oss.shutdown();}
+    }
+   };
+  }catch(Exception e){
+   oss.shutdown();
+   throw new IllegalStateException("OSS 读取失败: "+e.getMessage(),e);
+  }
+ }
  public long uploadFrom(Path source,String objectKey){
   requireConfigured();OSS oss=new OSSClientBuilder().build(endpoint,key,secret);
   try(InputStream in=Files.newInputStream(source)){oss.putObject(bucket,objectKey,in);return Files.size(source);}

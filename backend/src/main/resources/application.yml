@@ -16,6 +16,7 @@ server:
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   jwt-secret: ${JWT_SECRET:development-only-secret-development-only}
+  public-base: ${PUBLIC_BASE:/drama-studio}
   oauth:
     client-id: drama-studio
     client-secret: ${AI_CONNECT_CLIENT_SECRET:}

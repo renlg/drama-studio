@@ -14,12 +14,14 @@ import static org.mockito.Mockito.*;
 class EpisodeAssetServiceTest {
  @Test void aggregatesEpisodeAndChoosesSelectedOrLatestVersion(){
   AssetRepository assets=mock(AssetRepository.class);NodeRunRepository runs=mock(NodeRunRepository.class);ProjectService projects=mock(ProjectService.class);OssStorageService storage=mock(OssStorageService.class);
-  when(storage.presignGet(anyString(),any(Duration.class))).thenAnswer(i->"signed:"+i.getArgument(0));
+  MediaUrlSigner signer=mock(MediaUrlSigner.class);
+  when(signer.sign(anyString(),anyLong())).thenAnswer(i->"signed:"+(("thumb".equals(i.getArgument(1)))?"thumb-key":"image-key"));
+  when(signer.sign(anyString(),anyString(),anyLong())).thenAnswer(i->"signed:"+(("thumb".equals(i.getArgument(1)))?"thumb-key":"image-key"));
   NodeRun ep2=run("run-2","{\"episode_number\":2}"),noEpisode=run("run-none","{}");when(runs.findById("run-2")).thenReturn(Optional.of(ep2));when(runs.findById("run-none")).thenReturn(Optional.of(noEpisode));
   Asset old=image("old","shot-a",1,false,"run-2"),selected=image("selected","shot-a",2,true,"run-2"),newer=image("newer","shot-a",3,false,"run-2");
   Asset fallback=text("text","ep2-script",1,"run-none"),wrong=text("wrong","ep3-script",1,"run-none");
   when(assets.findByProjectIdAndDeletedAtIsNullOrderByCreatedAtDesc("project")).thenReturn(List.of(old,selected,newer,fallback,wrong));
-  var result=new EpisodeAssetService(assets,runs,projects,storage,new ObjectMapper()).get("project",2,"user");
+  var result=new EpisodeAssetService(assets,runs,projects,signer,new ObjectMapper()).get("project",2,"user");
   assertThat(result.groups().get("STORYBOARD_IMAGE")).extracting(EpisodeAssetService.EpisodeAsset::id).containsExactly("selected");
   assertThat(result.groups().get("STORYBOARD_IMAGE").get(0).previewUrl()).isEqualTo("signed:image-key");
   assertThat(result.groups().get("EPISODE_SCRIPT")).extracting(EpisodeAssetService.EpisodeAsset::contentText).containsExactly("episode text");

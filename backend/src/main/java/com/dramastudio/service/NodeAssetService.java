@@ -6,7 +6,6 @@ import com.dramastudio.entity.WorkflowRun;
 import com.dramastudio.repository.AssetRepository;
 import com.dramastudio.repository.NodeRunRepository;
 import com.dramastudio.repository.WorkflowRunRepository;
-import com.dramastudio.storage.OssStorageService;
 import java.time.Duration;
 import java.util.*;
 import org.springframework.stereotype.Service;
@@ -30,11 +29,11 @@ public class NodeAssetService {
  private final NodeRunRepository nodeRuns;
  private final WorkflowRunRepository runs;
  private final ProjectService projects;
- private final OssStorageService storage;
+ private final MediaUrlSigner signer;
 
  public NodeAssetService(AssetRepository a,NodeRunRepository n,WorkflowRunRepository r,
-                         ProjectService p,OssStorageService s){
-  assets=a;nodeRuns=n;runs=r;projects=p;storage=s;
+                         ProjectService p,MediaUrlSigner s){
+  assets=a;nodeRuns=n;runs=r;projects=p;signer=s;
  }
 
  public NodeAssets get(String projectId,String nodeId,String user){
@@ -71,9 +70,9 @@ public class NodeAssetService {
  private NodeAsset toDto(Asset a){
   String preview=null,thumbnail=null,play=null,text=null;
   boolean image=IMAGE.contains(a.assetType);
-  if(image&&a.storageKey!=null)preview=storage.presignGet(a.storageKey,Duration.ofMinutes(30));
-  if(image&&a.thumbnailKey!=null)thumbnail=storage.presignGet(a.thumbnailKey,Duration.ofMinutes(30));
-  if("SHOT_VIDEO".equals(a.assetType)&&a.storageKey!=null)play=storage.presignGet(a.storageKey,Duration.ofHours(2));
+  if(image&&a.storageKey!=null)preview=signer.sign(a.id,Duration.ofDays(7).toMillis());
+  if(image&&a.thumbnailKey!=null)thumbnail=signer.sign(a.id,"thumb",Duration.ofDays(7).toMillis());
+  if("SHOT_VIDEO".equals(a.assetType)&&a.storageKey!=null)play=signer.sign(a.id,Duration.ofDays(7).toMillis());
   if(a.contentText!=null&&!a.contentText.isBlank())text=a.contentText;
   return new NodeAsset(a.id,a.assetType,a.name,a.logicalKey,a.contentStatus,
       a.selected,a.locked,a.versionNo,preview,thumbnail,play,text,a.createdAt);
