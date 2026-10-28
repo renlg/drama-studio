@@ -5,7 +5,7 @@ import com.dramastudio.entity.*; import com.dramastudio.repository.*; import com
  public ProjectService(ProjectRepository p,WorkflowRepository w,JdbcTemplate j,ObjectMapper o){projects=p;workflows=w;jdbc=j;json=o;}
  public List<Project> list(String user){return projects.findByOwnerUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(user);}
  public Project getOwned(String id,String user){return projects.findById(id).filter(p->p.deletedAt==null&&p.ownerUserId.equals(user)).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"项目不存在"));}
- @Transactional public Workflow create(CreateProject r,String user){Project p=new Project();p.ownerUserId=user;p.name=r.name;p.description=r.description;p.storyEnvironment=r.storyEnvironment;p.genresJson=write(r.genres==null?List.of():r.genres);p.dramaType=or(r.dramaType,"动态漫");p.artStyle=or(r.artStyle,"半写实国漫");p.episodeCount=r.episodeCount==null?10:r.episodeCount;p.episodeDurationSec=r.episodeDurationSec==null?90:r.episodeDurationSec;projects.saveAndFlush(p);Workflow w=new Workflow();w.projectId=p.id;w.name="标准短剧管线";w.createdBy=user;w.canvasJson=standardCanvas(p);workflows.saveAndFlush(w);normalize(w);return w;}
+ @Transactional public Workflow create(CreateProject r,String user){Project p=new Project();p.ownerUserId=user;p.name=r.name;p.description=r.description;p.storyEnvironment=r.storyEnvironment;p.genresJson=write(r.genres==null?List.of():r.genres);p.dramaType=or(r.dramaType,"动态漫");p.artStyle=or(r.artStyle,"半写实国漫");p.episodeCount=r.episodeCount==null?10:r.episodeCount;p.episodeDurationSec=r.episodeDurationSec==null?90:r.episodeDurationSec;projects.saveAndFlush(p);Workflow w=new Workflow();w.projectId=p.id;w.name="自由创作画布";w.createdBy=user;w.canvasJson=emptyCanvas();workflows.saveAndFlush(w);normalize(w);return w;}
  public record CreateProject(String name,String description,String storyEnvironment,List<String> genres,String dramaType,String artStyle,Integer episodeCount,Integer episodeDurationSec){}
 
  /**
@@ -21,7 +21,10 @@ import com.dramastudio.entity.*; import com.dramastudio.repository.*; import com
   *                 -> CHARACTER_REFERENCE_IMAGE（全局角色定妆照，扇出前）
   *                 -> SCENE_REFERENCE_IMAGE / PROP_REFERENCE_IMAGE（参考图）
   */
- private String standardCanvas(Project p){try{
+ private String emptyCanvas(){return write(Map.of("schemaVersion","1.0","viewport",Map.of("x",0,"y",0,"zoom",1),"nodes",List.of(),"edges",List.of()));}
+ @Transactional public Workflow createDramaTemplate(String projectId,String user){Project p=getOwned(projectId,user);Workflow w=new Workflow();w.projectId=p.id;w.name="短剧管线模板";w.createdBy=user;w.canvasJson=dramaTemplate(p);workflows.saveAndFlush(w);normalize(w);return w;}
+ private String standardCanvas(Project p){return dramaTemplate(p);}
+ private String dramaTemplate(Project p){try{
    var ns=new ArrayList<Map<String,Object>>();var pos=new HashMap<String,int[]>();var id=new HashMap<String,String>();
    String[][] nodes={
      {"SETUP","PROJECT_SETUP",null},
