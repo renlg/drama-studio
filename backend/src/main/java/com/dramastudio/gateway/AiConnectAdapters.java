@@ -126,8 +126,9 @@ public class AiConnectAdapters {
         try {
           Map<String, Object> body = new LinkedHashMap<>();
           body.put("model", llmModel);
+          String system = Objects.toString(r.params().get("system_prompt"), SYSTEM_PROMPT);
           body.put("messages", List.of(
-              Map.of("role", "system", "content", SYSTEM_PROMPT),
+              Map.of("role", "system", "content", system.isBlank() ? SYSTEM_PROMPT : system),
               Map.of("role", "user", "content", r.prompt())));
           // 推理型模型（deepseek-v4.x）会先消耗 reasoning token，
           // max_tokens 太小会导致 content 为空，因此给足额度。
@@ -215,9 +216,7 @@ public class AiConnectAdapters {
               size = w.intValue() + "x" + h.intValue();
           }
           body.put("size", size);
-          if (!refs.isEmpty()) {
-            body.put("image", refs.size() == 1 ? refs.get(0) : refs);
-          }
+          if (!refs.isEmpty()) body.put("image", refs.get(0));
 
           JsonNode node = post("/images/generations", body, Duration.ofMinutes(5));
           JsonNode first = node.path("data").path(0);
@@ -284,12 +283,13 @@ public class AiConnectAdapters {
           Map<String, Object> body = new LinkedHashMap<>();
           body.put("model", videoModel);
           body.put("prompt", r.prompt());
-          if (r.referenceImageUrls().isEmpty()) {
-            throw new ProviderProtocol.ProviderException(
-                ProviderProtocol.ErrorCode.CONTENT_REJECTED, "图生视频缺少同分集分镜图");
-          }
           String mode = Objects.toString(r.params().get("mode"), "").trim();
-          if (mode.isBlank()) mode = "keyframe";
+          if (mode.isBlank()) mode = r.referenceImageUrls().isEmpty() ? "text" : "keyframe";
+          if (!Set.of("text","keyframe","reference").contains(mode)) mode = "keyframe";
+          if (!"text".equals(mode) && r.referenceImageUrls().isEmpty()) {
+            throw new ProviderProtocol.ProviderException(
+                ProviderProtocol.ErrorCode.CONTENT_REJECTED, "keyframe/reference 模式缺少输入图片");
+          }
           double requested = r.params().get("duration_sec") instanceof Number n ? n.doubleValue() : 5;
           int duration = (int) Math.round(Math.max(4, Math.min(12, requested)));
           // 依据 wiki.agnes-ai.com/zh-Hans/docs/agnes-video-25-flash：
@@ -301,9 +301,10 @@ public class AiConnectAdapters {
           body.put("seconds", duration);
           body.put("mode", mode);
           body.put("aspect_ratio", Objects.toString(r.params().get("aspect_ratio"), "9:16"));
+          body.put("n", 1);
           if ("reference".equals(mode)) {
             body.put("images", r.referenceImageUrls().subList(0, Math.min(5, r.referenceImageUrls().size())));
-          } else {
+          } else if ("keyframe".equals(mode)) {
             body.put("first_frame", r.referenceImageUrls().get(0));
           }
 

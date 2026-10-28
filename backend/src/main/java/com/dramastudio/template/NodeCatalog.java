@@ -1,10 +1,11 @@
 package com.dramastudio.template;
 import java.util.*;
 public final class NodeCatalog {
- public record Param(String type,Object defaultValue,boolean editable,String source){}
+ public record Param(String type,Object defaultValue,boolean editable,String source,List<Object> options){public Param(String type,Object defaultValue,boolean editable,String source){this(type,defaultValue,editable,source,List.of());}}
  public record Port(String name,String type,boolean required,boolean multiple){}
- public record Definition(String type,String label,String capability,List<Port> inputs,List<Port> outputs,LinkedHashMap<String,Param> params){}
+ public record Definition(String type,String label,String capability,String category,List<Port> inputs,List<Port> outputs,LinkedHashMap<String,Param> params){}
  private static Param p(String type,Object value,boolean editable,String source){return new Param(type,value,editable,source);}
+ private static Param pe(Object value,String source,Object... options){return new Param("enum",value,true,source,List.of(options));}
  private static LinkedHashMap<String,Param> params(Object... values){var m=new LinkedHashMap<String,Param>();for(int i=0;i<values.length;i+=2)m.put((String)values[i],(Param)values[i+1]);return m;}
  private static List<Port> ports(Port...p){return List.of(p);} private static Port in(String n,String t,boolean r,boolean m){return new Port(n,t,r,m);}
  private static final LinkedHashMap<String,Definition> ALL=new LinkedHashMap<>();
@@ -26,12 +27,44 @@ public final class NodeCatalog {
   add("SCENE_REFERENCE_IMAGE","场景参考图","IMAGE",ports(in("scene","SCENE_CARD_LIST",false,true),in("outline","OUTLINE",false,false)),ports(in("images","IMAGE_ASSET_LIST",true,true)),params("background",p("string","场景完整，无人物",true,"DEFAULT"),"composition",p("string","电影感广角构图",true,"DEFAULT"),"art_style",p("string","半写实国漫",true,"UPSTREAM"),"width",p("int",1536,true,"DEFAULT"),"height",p("int",1024,true,"DEFAULT"),"seed",p("long",null,true,"DEFAULT"),"output_count",p("int",1,true,"DEFAULT")));
   add("PROP_REFERENCE_IMAGE","道具参考图","IMAGE",ports(in("props","PROP_CARD_LIST",true,true)),ports(in("images","IMAGE_ASSET_LIST",true,true)),params("background",p("string","纯白背景",true,"DEFAULT"),"composition",p("string","产品设定图，多角度",true,"DEFAULT"),"art_style",p("string","半写实国漫",true,"UPSTREAM"),"width",p("int",1536,true,"DEFAULT"),"height",p("int",1024,true,"DEFAULT"),"seed",p("long",null,true,"DEFAULT"),"output_count",p("int",1,true,"DEFAULT")));
 
+  add("TEXT_GEN","文本生成","LLM","TEXT",ports(in("text","TEXT",false,true)),ports(in("text","TEXT",true,false)),params(
+      "prompt",p("textarea","",true,"USER"),"system_prompt",p("textarea","你是专业内容创作者，直接输出成品，不要复述需求",true,"USER"),
+      "negative_prompt",p("textarea","",true,"USER"),"temperature",p("decimal",0.7,true,"DEFAULT"),
+      "max_tokens",p("int",4096,true,"DEFAULT"),"output_format",pe("TEXT","DEFAULT","TEXT","JSON")));
+  add("IMAGE_GEN","图片生成","IMAGE","IMAGE",ports(in("ref_images","ASSET_REF_LIST",false,true)),ports(in("images","IMAGE_ASSET_LIST",true,true)),params(
+      "prompt",p("textarea","",true,"USER"),"negative_prompt",p("textarea","different face, extra people, watermark, text",true,"USER"),
+      "width",p("int",1024,true,"DEFAULT"),"height",p("int",1536,true,"DEFAULT"),"seed",p("long",null,true,"DEFAULT"),
+      "steps",p("int",20,true,"DEFAULT"),"cfg_scale",p("decimal",7.0,true,"DEFAULT"),"image_strength",p("decimal",0.6,true,"DEFAULT"),"output_count",p("int",1,true,"DEFAULT")));
+  add("VIDEO_GEN","视频生成","VIDEO","VIDEO",ports(in("images","IMAGE_ASSET_LIST",false,true)),ports(in("videos","VIDEO_ASSET_LIST",true,true)),params(
+      "prompt",p("textarea","",true,"USER"),"negative_prompt",p("textarea","",true,"USER"),"mode",pe("keyframe","DEFAULT","text","keyframe","reference"),
+      "duration_sec",p("int",5,true,"DEFAULT"),"resolution",pe("720P","DEFAULT","720P"),"aspect_ratio",pe("9:16","DEFAULT","9:16","16:9","1:1"),
+      "first_frame_url",p("string","",true,"UPSTREAM"),"seed",p("long",null,true,"DEFAULT")));
+  add("VIDEO_MULTI_KEYFRAME","智能多帧","VIDEO","VIDEO",ports(in("images","IMAGE_ASSET_LIST",true,true)),ports(in("videos","VIDEO_ASSET_LIST",true,true)),params(
+      "prompt",p("textarea","",true,"USER"),"shot_duration_sec",p("int",5,true,"DEFAULT"),"aspect_ratio",pe("9:16","DEFAULT","9:16","16:9","1:1"),"max_shots",p("int",5,true,"DEFAULT")));
+
+  add("VIDEO_CONCAT","视频拼接","FFMPEG","EDIT",ports(in("videos","VIDEO_ASSET_LIST",true,true)),ports(in("video","VIDEO_ASSET_LIST",true,false)),params(
+      "transition",pe("none","DEFAULT","none","fade"),"transition_duration",p("decimal",0.5,true,"DEFAULT"),"reencode",p("boolean",true,true,"DEFAULT"),"output_name",p("string","merged",true,"DEFAULT")));
+  add("MEDIA_TRIM","媒体裁剪","FFMPEG","EDIT",ports(in("media","VIDEO_ASSET_LIST",true,false)),ports(in("video","VIDEO_ASSET_LIST",true,false)),params(
+      "start_sec",p("decimal",0,true,"DEFAULT"),"end_sec",p("decimal",null,true,"DEFAULT"),"reencode",p("boolean",true,true,"DEFAULT")));
+  add("VIDEO_MUX_AUDIO","视频配音/配乐","FFMPEG","EDIT",ports(in("video","VIDEO_ASSET_LIST",true,false),in("audio","ASSET_REF_LIST",true,false)),ports(in("video","VIDEO_ASSET_LIST",true,false)),params(
+      "audio_volume",p("decimal",1.0,true,"DEFAULT"),"keep_original_audio",p("boolean",false,true,"DEFAULT"),"audio_offset_sec",p("decimal",0,true,"DEFAULT"),"shortest",p("boolean",true,true,"DEFAULT")));
+  add("MEDIA_SCALE","分辨率/画幅调整","FFMPEG","EDIT",ports(in("media","VIDEO_ASSET_LIST",true,false)),ports(in("video","VIDEO_ASSET_LIST",true,false)),params(
+      "width",p("int",720,true,"DEFAULT"),"height",p("int",1280,true,"DEFAULT"),"fit",pe("cover","DEFAULT","contain","cover","stretch"),"pad_color",p("string","#000000",true,"DEFAULT")));
+  add("MEDIA_EXTRACT_FRAME","抽取帧","FFMPEG","EDIT",ports(in("video","VIDEO_ASSET_LIST",true,false)),ports(in("images","IMAGE_ASSET_LIST",true,true)),params(
+      "mode",pe("single","DEFAULT","single","first","last","every_n"),"at_sec",p("decimal",0,true,"DEFAULT"),"every_n_sec",p("decimal",2,true,"DEFAULT"),"max_frames",p("int",10,true,"DEFAULT")));
+  add("IMAGE_CHROMA_KEY","抠图","FFMPEG","EDIT",ports(in("images","IMAGE_ASSET_LIST",true,true)),ports(in("images","IMAGE_ASSET_LIST",true,true)),params(
+      "key_color",p("string","#FFFFFF",true,"DEFAULT"),"similarity",p("decimal",0.12,true,"DEFAULT"),"blend",p("decimal",0.05,true,"DEFAULT"),"output_format",pe("png","DEFAULT","png","webp")));
+  add("VIDEO_INTERPOLATE","视频补帧","FFMPEG","EDIT",ports(in("video","VIDEO_ASSET_LIST",true,false)),ports(in("video","VIDEO_ASSET_LIST",true,false)),params(
+      "fps",p("int",30,true,"DEFAULT"),"mode",pe("mci","DEFAULT","dup","blend","mci")));
+
   // 为兼容已有模板，旧节点新增参数只允许追加，禁止改变原有默认值。
   ALL.get("EPISODE_SCRIPT").params().put("episode_scope",p("enum","全部",true,"DEFAULT"));
   ALL.get("EPISODE_SCRIPT").params().put("episode_list",p("int[]",List.of(),true,"USER"));
   ALL.get("IMAGE_TO_VIDEO").params().put("mode",p("string","",true,"USER"));
  }
- private static void add(String t,String l,String c,List<Port> i,List<Port> o,LinkedHashMap<String,Param> p){ if(!c.equals("NONE")){p.putIfAbsent("provider",new Param("enum","AUTO",true,"DEFAULT"));p.putIfAbsent("model",new Param("string","",true,"DEFAULT"));p.putIfAbsent("timeout_sec",new Param("int",c.equals("VIDEO")?1800:c.equals("IMAGE")?300:120,true,"DEFAULT"));p.putIfAbsent("retry_count",new Param("int",3,true,"DEFAULT"));if(c.equals("LLM")){p.putIfAbsent("temperature",new Param("decimal",0.7,true,"DEFAULT"));p.putIfAbsent("max_tokens",new Param("int",8192,true,"DEFAULT"));p.putIfAbsent("output_count",new Param("int",1,true,"DEFAULT"));}}ALL.put(t,new Definition(t,l,c,i,o,p));}
+ private static void add(String t,String l,String c,List<Port> i,List<Port> o,LinkedHashMap<String,Param> p){add(t,l,c,category(t,c),i,o,p);}
+ private static void add(String t,String l,String c,String category,List<Port> i,List<Port> o,LinkedHashMap<String,Param> p){ if(!c.equals("NONE")&&!c.equals("FFMPEG")){p.putIfAbsent("provider",new Param("enum","AUTO",true,"DEFAULT"));p.putIfAbsent("model",new Param("string","",true,"DEFAULT"));p.putIfAbsent("timeout_sec",new Param("int",c.equals("VIDEO")?1800:c.equals("IMAGE")?300:120,true,"DEFAULT"));p.putIfAbsent("retry_count",new Param("int",3,true,"DEFAULT"));if(c.equals("LLM")){p.putIfAbsent("temperature",new Param("decimal",0.7,true,"DEFAULT"));p.putIfAbsent("max_tokens",new Param("int",8192,true,"DEFAULT"));p.putIfAbsent("output_count",new Param("int",1,true,"DEFAULT"));}}ALL.put(t,new Definition(t,l,c,category,i,o,p));}
+ private static String category(String t,String c){if("ASSET_INPUT".equals(t))return "ASSET";if("GENERIC_LLM".equals(t))return "TEXT";if(c.equals("IMAGE"))return "IMAGE";if(c.equals("VIDEO"))return "VIDEO";return "DRAMA";}
  public static Map<String,Definition> all(){return Collections.unmodifiableMap(ALL);} public static Definition get(String t){return ALL.get(t);}
  private NodeCatalog(){}
 }

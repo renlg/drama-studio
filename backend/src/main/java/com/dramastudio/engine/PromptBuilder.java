@@ -154,6 +154,16 @@ public class PromptBuilder {
           + str(config.getOrDefault("background", "纯白背景")) + "；"
           + str(config.getOrDefault("composition", "产品设定图，多角度")) + "；无人物、无文字、无水印。";
 
+      case "TEXT_GEN" -> str(config.get("prompt"))
+          + "\n直接输出成品，不要复述需求。总字数严格控制在 800 字以内。"
+          + ("JSON".equalsIgnoreCase(str(config.get("output_format"))) ? "仅输出合法 JSON，不要 markdown。" : "");
+
+      case "GENERIC_LLM" -> str(config.get("user_prompt"));
+
+      case "IMAGE_GEN" -> str(config.get("prompt"));
+
+      case "VIDEO_GEN", "VIDEO_MULTI_KEYFRAME" -> str(config.get("prompt"));
+
       case "IMAGE_TO_VIDEO" -> {
         Object prompt = config.get("motion_prompt");
         yield (prompt == null || String.valueOf(prompt).isBlank()
@@ -162,7 +172,7 @@ public class PromptBuilder {
             + "。保持画面人物一致，无镜头切换，无文字。";
       }
 
-      default -> ctx + nodeType;
+      default -> throw new IllegalArgumentException("未支持的提示词节点类型: " + nodeType);
     };
   }
 
