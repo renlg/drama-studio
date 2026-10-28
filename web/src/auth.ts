@@ -20,6 +20,11 @@ export function isLoggedIn(): boolean {
 }
 
 /** 跳转到后端 OAuth 入口（会 302 到 ai-connect 授权页） */
-export function goLogin(): void {
+export function goOAuth(): void {
   location.href = BASE + '/auth/login';
+}
+
+/** 整页跳转到前端登录页，清空应用内存状态 */
+export function goLoginPage(): void {
+  location.replace(BASE + '/login');
 }

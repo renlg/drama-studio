@@ -7,7 +7,7 @@ import AssetsPage from './pages/AssetsPage';
 import TasksPage from './pages/TasksPage';
 import TemplatesPage from './pages/TemplatesPage';
 import LoginPage from './pages/LoginPage';
-import {BASE,clearToken,goLogin,isLoggedIn,setToken} from './auth';
+import {BASE,clearToken,isLoggedIn,setToken} from './auth';
 
 /** 需要登录才能访问的页面统一包一层；未登录直接跳 /login */
 function RequireAuth({children}:{children:React.ReactNode}){
@@ -29,7 +29,7 @@ function Shell(){
       <Layout.Header className="header">
         <Typography.Title level={3}>鲸剧 · Drama Studio</Typography.Title>
         <Menu theme="dark" mode="horizontal" selectedKeys={[loc.pathname]} items={items} onClick={e=>nav(e.key)}/>
-        <Button onClick={()=>{clearToken();goLogin()}}>退出</Button>
+        <Button onClick={()=>{clearToken();location.replace(BASE+'/login')}}>退出</Button>
       </Layout.Header>
       <Layout.Content>
         <Routes>
