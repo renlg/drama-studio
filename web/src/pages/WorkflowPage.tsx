@@ -10,8 +10,6 @@ import DramaNode from '../components/DramaNode';
 import {useWorkflow} from '../store/workflow';
 import {useCatalog,defaultConfig} from '../store/catalog';
 import EpisodeOverviewNode from '../components/EpisodeOverviewNode';
-import {useWorkflow} from '../store/workflow';
-import {useCatalog,defaultConfig} from '../store/catalog';
 
 const nodeTypes={default:DramaNode,episodeOverview:EpisodeOverviewNode};
 
