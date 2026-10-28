@@ -45,8 +45,8 @@ function Canvas(){
     message.error('添加节点失败：'+(err instanceof Error?err.message:String(err)));
    }
   }}>
-   <ReactFlow nodes={s.nodes.map(n=>({...n,type:n.type==='EPISODE_OVERVIEW'?'episodeOverview':'default'}))} edges={s.edges} nodeTypes={nodeTypes} onInit={x=>rf.current=x} onNodesChange={s.changeNodes} onEdgesChange={s.changeEdges} onConnect={s.connect} onNodeClick={(_,n)=>s.select(n.id)} fitView minZoom={.1} maxZoom={2} deleteKeyCode="Delete" multiSelectionKeyCode="Shift"><MiniMap/><Controls/><Background/></ReactFlow>
-  </div><ParameterPanel/></div><div className="run-log">运行日志 · 状态变化通过 SSE 实时推送，可在任务中心查看详情</div>
+   <ReactFlow nodes={s.nodes.map(n=>({...n,type:n.type==='EPISODE_OVERVIEW'?'episodeOverview':'default'}))} edges={s.edges} nodeTypes={nodeTypes} onInit={x=>rf.current=x} onNodesChange={s.changeNodes} onEdgesChange={s.changeEdges} onConnect={s.connect} onNodeClick={(_,n)=>s.select(n.id)} fitView minZoom={.1} maxZoom={2} deleteKeyCode={['Delete','Backspace']} multiSelectionKeyCode="Shift"><MiniMap/><Controls/><Background/></ReactFlow>
+  </div><ParameterPanel/></div><div className="run-log">运行日志 · 状态变化通过 SSE 实时推送，可在任务中心查看详情 · 选中节点后按 Delete 键删除</div>
  </div>
 }
 export default function WorkflowPage(){return <ReactFlowProvider><Canvas/></ReactFlowProvider>}
