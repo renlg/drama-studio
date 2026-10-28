@@ -23,6 +23,8 @@ public class NodeAssetService {
  private static final Set<String> TEXT=Set.of(
      "EPISODE_SCRIPT","SHOT_CARD_LIST","PROJECT_STATE","OUTLINE","CHARACTER_CARD_LIST",
      "STORYBOARD_SCRIPT","EPISODE_OVERVIEW","PROJECT_SETUP");
+ private static final Set<String> IMAGE=Set.of(
+     "STORYBOARD_IMAGE","CHARACTER_REFERENCE_IMAGE","SCENE_REFERENCE_IMAGE","PROP_REFERENCE_IMAGE");
 
  private final AssetRepository assets;
  private final NodeRunRepository nodeRuns;
@@ -68,7 +70,7 @@ public class NodeAssetService {
 
  private NodeAsset toDto(Asset a){
   String preview=null,thumbnail=null,play=null,text=null;
-  boolean image="STORYBOARD_IMAGE".equals(a.assetType)||"CHARACTER_REFERENCE_IMAGE".equals(a.assetType);
+  boolean image=IMAGE.contains(a.assetType);
   if(image&&a.storageKey!=null)preview=storage.presignGet(a.storageKey,Duration.ofMinutes(30));
   if(image&&a.thumbnailKey!=null)thumbnail=storage.presignGet(a.thumbnailKey,Duration.ofMinutes(30));
   if("SHOT_VIDEO".equals(a.assetType)&&a.storageKey!=null)play=storage.presignGet(a.storageKey,Duration.ofHours(2));

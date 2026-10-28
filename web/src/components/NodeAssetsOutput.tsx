@@ -2,6 +2,7 @@ import {useCallback,useEffect,useState} from 'react';
 import {Collapse,Empty,Image,Skeleton,Space,Tag,Typography} from 'antd';
 import {useParams} from 'react-router-dom';
 import {api} from '../api/client';
+import {isImageAsset,isTextAsset,isVideoAsset} from '../utils/assetTypes';
 
 export interface NodeAsset {
   id: string;
@@ -51,10 +52,6 @@ export function useNodeAssets(nodeId: string | undefined, autoRefresh = false) {
   return {data, loading, failed, reload: load};
 }
 
-const isImage = (t: string) => t === 'STORYBOARD_IMAGE' || t === 'CHARACTER_REFERENCE_IMAGE';
-const isVideo = (t: string) => t === 'SHOT_VIDEO';
-const isText = (t: string) => !isImage(t) && !isVideo(t);
-
 const STATUS_TAG: Record<string, string> = {
   draft: 'default', approved: 'green', selected: 'blue',
   locked: 'purple', rejected: 'red', revision: 'orange',
@@ -72,9 +69,9 @@ export default function NodeAssetsOutput({nodeId, autoRefresh = false}: {nodeId:
     return <Empty description="该节点暂无产出，运行后可在此查看" />;
   }
 
-  const images = list.filter(a => isImage(a.assetType));
-  const videos = list.filter(a => isVideo(a.assetType));
-  const texts = list.filter(a => isText(a.assetType));
+  const images = list.filter(a => isImageAsset(a.assetType));
+  const videos = list.filter(a => isVideoAsset(a.assetType));
+  const texts = list.filter(a => isTextAsset(a.assetType));
 
   return (
     <div className="node-assets-output">
