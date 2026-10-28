@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, Collapse, Empty, Space, Tabs, Tag, Typography } from 'antd';
+import { Button, Card, Collapse, Empty, Select, Space, Tabs, Tag, Typography, message } from 'antd';
 import { api, unwrap } from '../api/client';
+import {useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 
 interface Template {
   id: string;
@@ -20,6 +22,8 @@ interface Template {
 }
 
 export default function TemplatesPage() {
+  const nav=useNavigate(),[projectId,setProjectId]=useState<string>();
+  const projects=useQuery({queryKey:['projects','template-picker'],queryFn:()=>unwrap<{id:string;name:string}[]>(api.get('/projects'))});
   const q = useQuery({
     queryKey: ['templates'],
     queryFn: () => unwrap<Template[]>(api.get('/templates')),
@@ -27,6 +31,9 @@ export default function TemplatesPage() {
 
   const built = (
     <Space direction="vertical" style={{ width: '100%' }}>
+      <Card title="短剧管线模板" extra={<Tag color="purple">17+ 节点</Tag>}>
+        <Space wrap><Select style={{width:240}} placeholder="选择目标项目" value={projectId} onChange={setProjectId} options={projects.data?.map(p=>({value:p.id,label:p.name}))}/><Button type="primary" disabled={!projectId} onClick={async()=>{const {data}=await api.post(`/projects/${projectId}/workflows/drama-template`);message.success('短剧管线画布已创建');nav(`/projects/${projectId}/workflows/${data.workflowId}`)}}>一键创建画布</Button></Space>
+      </Card>
       {q.data?.map((t) => (
         <Card
           key={t.id}

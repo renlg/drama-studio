@@ -1,2 +1,9 @@
-import {Input,Typography} from 'antd';import {useState} from 'react';const nodes=[['PROJECT_SETUP','项目设定'],['STORY_OUTLINE','剧本大纲'],['EPISODE_SPLITTER','分集拆解'],['EPISODE_BRANCH','分集扇出'],['CHARACTER_CARD','角色卡'],['EPISODE_SCRIPT','分集剧本'],['STORYBOARD_SCRIPT','分镜脚本'],['SCENE_PROP_CARD','场景道具卡'],['CHARACTER_REFERENCE_IMAGE','角色参考图'],['SCENE_REFERENCE_IMAGE','场景参考图'],['PROP_REFERENCE_IMAGE','道具参考图'],['STORYBOARD_IMAGE','分镜图'],['IMAGE_TO_VIDEO','图生视频'],['GENERIC_LLM','通用 LLM'],['ASSET_INPUT','素材上传']];
-export default function NodeLibrary(){const [q,setQ]=useState('');return <aside className="node-library"><Typography.Title level={5}>节点库</Typography.Title><Input.Search placeholder="搜索节点 / 按 / 聚焦" value={q} onChange={e=>setQ(e.target.value)}/>{nodes.filter(x=>x.join('').toLowerCase().includes(q.toLowerCase())).map(([type,label])=><div draggable key={type} className="library-item" onDragStart={e=>{e.dataTransfer.setData('node/type',type);e.dataTransfer.setData('node/label',label)}}>{label}<small>{type}</small></div>)}</aside>}
+import {Input,Typography} from 'antd';
+import {useEffect,useState} from 'react';
+import {useCatalog} from '../store/catalog';
+const groups=[['TEXT','📝 文本'],['IMAGE','🖼 图片'],['VIDEO','🎬 视频'],['EDIT','✂️ 剪辑'],['DRAMA','🎭 短剧'],['ASSET','📦 素材']] as const;
+export default function NodeLibrary(){
+ const [q,setQ]=useState(''),catalog=useCatalog();useEffect(()=>{catalog.load().catch(()=>{})},[]);
+ const defs=Object.values(catalog.defs).filter(d=>(d.label+d.type).toLowerCase().includes(q.toLowerCase()));
+ return <aside className="node-library"><Typography.Title level={5}>节点库</Typography.Title><Input.Search placeholder="搜索节点" value={q} onChange={e=>setQ(e.target.value)}/>{groups.map(([key,title])=>{const nodes=defs.filter(d=>d.category===key);return nodes.length?<section key={key} className="library-group"><Typography.Text strong>{title}</Typography.Text>{nodes.map(d=><div draggable key={d.type} className="library-item" onDragStart={e=>{e.dataTransfer.setData('node/type',d.type);e.dataTransfer.setData('node/label',d.label)}}>{d.label}<small>{d.type}</small></div>)}</section>:null})}</aside>
+}

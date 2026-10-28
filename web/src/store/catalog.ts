@@ -6,6 +6,7 @@ export interface CatalogParam {
   defaultValue: unknown;
   editable: boolean;
   source: string;
+  options?: unknown[];
 }
 export interface CatalogPort {
   name: string;
@@ -17,6 +18,7 @@ export interface CatalogDef {
   type: string;
   label: string;
   capability: string;
+  category: string;
   inputs: CatalogPort[];
   outputs: CatalogPort[];
   params: Record<string, CatalogParam>;
@@ -152,6 +154,35 @@ export const PARAM_LABELS: Record<string, string> = {
   files: '文件',
   required_status: '要求状态',
   description: '描述',
+  prompt: '提示词',
+  text: '上游文本',
+  ref_images: '参考图片',
+  steps: '采样步数',
+  cfg_scale: '提示词相关度',
+  image_strength: '图生图强度',
+  first_frame_url: '首帧地址',
+  shot_duration_sec: '每段时长(秒)',
+  aspect_ratio: '画幅比例',
+  max_shots: '最大镜头数',
+  transition: '转场',
+  transition_duration: '转场时长(秒)',
+  reencode: '重新编码',
+  output_name: '输出名称',
+  start_sec: '开始时间(秒)',
+  end_sec: '结束时间(秒)',
+  audio_volume: '音量',
+  keep_original_audio: '保留原音',
+  audio_offset_sec: '音频偏移(秒)',
+  shortest: '按最短流结束',
+  fit: '适配方式',
+  pad_color: '填充颜色',
+  at_sec: '抽帧时间(秒)',
+  every_n_sec: '抽帧间隔(秒)',
+  max_frames: '最大帧数',
+  key_color: '抠除颜色',
+  similarity: '颜色容差',
+  blend: '边缘羽化',
+  fps: '目标帧率',
 };
 
 export function paramLabel(key: string): string {

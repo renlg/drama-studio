@@ -1,6 +1,40 @@
-import {useCallback,useEffect,useRef} from 'react';import ReactFlow,{Background,Controls,MiniMap,ReactFlowProvider,type ReactFlowInstance} from 'reactflow';import {Button,Dropdown,Space,message} from 'antd';import {CloudUploadOutlined,PlayCircleOutlined,RedoOutlined,SaveOutlined,UndoOutlined} from '@ant-design/icons';import {useParams,useNavigate} from 'react-router-dom';import {api} from '../api/client';import NodeLibrary from '../components/NodeLibrary';import ParameterPanel from '../components/ParameterPanel';import DramaNode from '../components/DramaNode';import {useWorkflow} from '../store/workflow';
+import {useCallback,useEffect,useRef,useState} from 'react';
+import ReactFlow,{Background,Controls,MiniMap,ReactFlowProvider,type ReactFlowInstance} from 'reactflow';
+import {AutoComplete,Button,Dropdown,Space,message} from 'antd';
+import {CloudUploadOutlined,PlayCircleOutlined,RedoOutlined,SaveOutlined,UndoOutlined} from '@ant-design/icons';
+import {useParams,useNavigate} from 'react-router-dom';
+import {api} from '../api/client';
+import NodeLibrary from '../components/NodeLibrary';
+import ParameterPanel from '../components/ParameterPanel';
+import DramaNode from '../components/DramaNode';
+import {useWorkflow} from '../store/workflow';
 import {useCatalog,defaultConfig} from '../store/catalog';
 import EpisodeOverviewNode from '../components/EpisodeOverviewNode';
+import {useWorkflow} from '../store/workflow';
+import {useCatalog,defaultConfig} from '../store/catalog';
+
 const nodeTypes={default:DramaNode,episodeOverview:EpisodeOverviewNode};
-function Canvas(){const {workflowId,projectId}=useParams(),nav=useNavigate(),s=useWorkflow(),cat=useCatalog(),rf=useRef<ReactFlowInstance>();useEffect(()=>{cat.load().catch(()=>{})},[]);useEffect(()=>{api.get(`/workflows/${workflowId}`).then(({data})=>s.load(data.canvas,data.revision))},[workflowId]);const save=useCallback(async()=>{const {data}=await api.put(`/workflows/${workflowId}`,{revision:s.revision,canvas:{schemaVersion:'1.0',viewport:rf.current?.getViewport(),nodes:s.nodes,edges:s.edges}});s.markSaved(data.revision)},[s.nodes,s.edges,s.revision,workflowId]);useEffect(()=>{if(!s.dirty)return;const t=setTimeout(()=>save().catch(()=>message.error('自动保存失败')),2000);return()=>clearTimeout(t)},[s.dirty,s.nodes,s.edges]);const run=async()=>{await save();const {data}=await api.post(`/workflows/${workflowId}/runs`,{});message.success(`任务已提交 ${data.id}`)};return <div className="workflow-page"><div className="canvas-toolbar"><Space><Button icon={<UndoOutlined/>} onClick={s.undo} disabled={!s.past.length}/><Button icon={<RedoOutlined/>} onClick={s.redo} disabled={!s.future.length}/><Button icon={<SaveOutlined/>} onClick={save}>保存</Button><Button icon={<CloudUploadOutlined/>} onClick={()=>api.post(`/workflows/${workflowId}/publish`).then(()=>message.success('已发布'))}>发布</Button><Dropdown.Button type="primary" icon={<PlayCircleOutlined/>} onClick={run} menu={{items:[{key:'all',label:'运行全部'},{key:'to',label:'运行到此节点'},{key:'only',label:'仅运行此节点'},{key:'rerun',label:'从此节点重跑'}]}}>运行</Dropdown.Button><Button onClick={()=>nav(`/projects/${projectId}/assets`)}>资产库</Button></Space><span>{s.dirty?'有未保存修改':'已同步'}</span></div><div className="canvas-body"><NodeLibrary/><div className="flow" onDragOver={e=>e.preventDefault()} onDrop={e=>{const type=e.dataTransfer.getData('node/type');if(!type)return;const p=rf.current!.screenToFlowPosition({x:e.clientX,y:e.clientY});s.addNode({id:crypto.randomUUID(),type,position:p,data:{name:e.dataTransfer.getData('node/label'),config:defaultConfig(cat.defs[type])}})}}><ReactFlow nodes={s.nodes.map(n=>({...n,type:n.type==='EPISODE_OVERVIEW'?'episodeOverview':'default'}))} edges={s.edges} nodeTypes={nodeTypes} onInit={x=>rf.current=x} onNodesChange={s.changeNodes} onEdgesChange={s.changeEdges} onConnect={s.connect} onNodeClick={(_,n)=>s.select(n.id)} fitView minZoom={.1} maxZoom={2} deleteKeyCode="Delete" multiSelectionKeyCode="Shift"><MiniMap/><Controls/><Background/></ReactFlow></div><ParameterPanel/></div><div className="run-log">运行日志 · 状态变化通过 SSE 实时推送，可在任务中心查看详情</div></div>}
+
+function Canvas(){
+ const {workflowId,projectId}=useParams(),nav=useNavigate(),s=useWorkflow(),cat=useCatalog();
+ const rf=useRef<ReactFlowInstance>(),[find,setFind]=useState('');
+ useEffect(()=>{cat.load().catch(()=>{})},[]);
+ useEffect(()=>{api.get(`/workflows/${workflowId}`).then(({data})=>s.load(data.canvas,data.revision))},[workflowId]);
+ const save=useCallback(async()=>{const {data}=await api.put(`/workflows/${workflowId}`,{revision:s.revision,canvas:{schemaVersion:'1.0',viewport:rf.current?.getViewport(),nodes:s.nodes,edges:s.edges}});s.markSaved(data.revision)},[s.nodes,s.edges,s.revision,workflowId]);
+ useEffect(()=>{if(!s.dirty)return;const t=setTimeout(()=>save().catch(()=>message.error('自动保存失败')),2000);return()=>clearTimeout(t)},[s.dirty,s.nodes,s.edges]);
+ const run=async()=>{await save();const {data}=await api.post(`/workflows/${workflowId}/runs`,{});message.success(`任务已提交 ${data.id}`)};
+ const options=s.nodes.filter(n=>(n.data.name+(n.type??'')).toLowerCase().includes(find.toLowerCase())).map(n=>({value:n.id,label:`${n.data.name} · ${n.type}`}));
+ return <div className="workflow-page">
+  <div className="canvas-toolbar"><Space>
+   <Button icon={<UndoOutlined/>} onClick={s.undo} disabled={!s.past.length}/><Button icon={<RedoOutlined/>} onClick={s.redo} disabled={!s.future.length}/>
+   <Button icon={<SaveOutlined/>} onClick={save}>保存</Button><Button icon={<CloudUploadOutlined/>} onClick={()=>api.post(`/workflows/${workflowId}/publish`).then(()=>message.success('已发布'))}>发布</Button>
+   <Dropdown.Button type="primary" icon={<PlayCircleOutlined/>} onClick={run} menu={{items:[{key:'all',label:'运行全部'},{key:'to',label:'运行到此节点'},{key:'only',label:'仅运行此节点'},{key:'rerun',label:'从此节点重跑'}]}}>运行</Dropdown.Button>
+   <AutoComplete style={{width:220}} value={find} options={options} placeholder="定位节点名 / 类型" onSearch={setFind} onSelect={id=>{const node=s.nodes.find(n=>n.id===id);if(node){s.select(id);rf.current?.fitView({nodes:[node],duration:350,maxZoom:1.3})}}}/>
+   <Button onClick={()=>nav(`/projects/${projectId}/assets`)}>资产库</Button>
+  </Space><span>{s.dirty?'有未保存修改':'已同步'}</span></div>
+  <div className="canvas-body"><NodeLibrary/><div className="flow" onDragOver={e=>e.preventDefault()} onDrop={e=>{const type=e.dataTransfer.getData('node/type');if(!type)return;const p=rf.current!.screenToFlowPosition({x:e.clientX,y:e.clientY});s.addNode({id:crypto.randomUUID(),type,position:p,data:{name:e.dataTransfer.getData('node/label'),config:defaultConfig(cat.defs[type])}})}}>
+   <ReactFlow nodes={s.nodes.map(n=>({...n,type:n.type==='EPISODE_OVERVIEW'?'episodeOverview':'default'}))} edges={s.edges} nodeTypes={nodeTypes} onInit={x=>rf.current=x} onNodesChange={s.changeNodes} onEdgesChange={s.changeEdges} onConnect={s.connect} onNodeClick={(_,n)=>s.select(n.id)} fitView minZoom={.1} maxZoom={2} deleteKeyCode="Delete" multiSelectionKeyCode="Shift"><MiniMap/><Controls/><Background/></ReactFlow>
+  </div><ParameterPanel/></div><div className="run-log">运行日志 · 状态变化通过 SSE 实时推送，可在任务中心查看详情</div>
+ </div>
+}
 export default function WorkflowPage(){return <ReactFlowProvider><Canvas/></ReactFlowProvider>}

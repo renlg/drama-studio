@@ -26,6 +26,7 @@ function Field({def,value,onChange}:{def?:CatalogParam;value:unknown;onChange:(v
 
   if(t==='decimal')return <InputNumber style={{width:'100%'}} step={0.05} value={value as number|undefined} onChange={onChange}/>;
 
+  if(t==='enum'&&def?.options?.length)return <Select style={{width:'100%'}} value={value} options={def.options.map(x=>({value:x,label:String(x)}))} onChange={onChange}/>;
   if(t==='enum')return <Input value={String(value??'')} onChange={e=>onChange(e.target.value)} placeholder="枚举值"/>;
 
   if(t==='string[]')return <Select mode="tags" style={{width:'100%'}} value={(value as string[])??[]} onChange={onChange} placeholder="回车添加"/>;
