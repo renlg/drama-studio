@@ -10,6 +10,7 @@ import DramaNode from '../components/DramaNode';
 import {useWorkflow} from '../store/workflow';
 import {useCatalog,defaultConfig} from '../store/catalog';
 import EpisodeOverviewNode from '../components/EpisodeOverviewNode';
+import {newId} from '../utils/uuid';
 
 const nodeTypes={default:DramaNode,episodeOverview:EpisodeOverviewNode};
 
@@ -30,7 +31,20 @@ function Canvas(){
    <AutoComplete style={{width:220}} value={find} options={options} placeholder="定位节点名 / 类型" onSearch={setFind} onSelect={id=>{const node=s.nodes.find(n=>n.id===id);if(node){s.select(id);rf.current?.fitView({nodes:[node],duration:350,maxZoom:1.3})}}}/>
    <Button onClick={()=>nav(`/projects/${projectId}/assets`)}>资产库</Button>
   </Space><span>{s.dirty?'有未保存修改':'已同步'}</span></div>
-  <div className="canvas-body"><NodeLibrary/><div className="flow" onDragOver={e=>e.preventDefault()} onDrop={e=>{const type=e.dataTransfer.getData('node/type');if(!type)return;const p=rf.current!.screenToFlowPosition({x:e.clientX,y:e.clientY});s.addNode({id:crypto.randomUUID(),type,position:p,data:{name:e.dataTransfer.getData('node/label'),config:defaultConfig(cat.defs[type])}})}}>
+  <div className="canvas-body"><NodeLibrary/><div className="flow" onDragOver={e=>e.preventDefault()} onDrop={e=>{
+   e.preventDefault();
+   try {
+    const type=e.dataTransfer.getData('node/type');
+    if(!type) return;
+    const def=cat.defs[type];
+    if(!def){message.error('节点类型未加载，请刷新页面重试');return;}
+    const p=rf.current!.screenToFlowPosition({x:e.clientX,y:e.clientY});
+    s.addNode({id:newId(),type,position:p,data:{name:def.label??type,config:defaultConfig(def)}});
+   } catch(err) {
+    console.error('add node failed',err);
+    message.error('添加节点失败：'+(err instanceof Error?err.message:String(err)));
+   }
+  }}>
    <ReactFlow nodes={s.nodes.map(n=>({...n,type:n.type==='EPISODE_OVERVIEW'?'episodeOverview':'default'}))} edges={s.edges} nodeTypes={nodeTypes} onInit={x=>rf.current=x} onNodesChange={s.changeNodes} onEdgesChange={s.changeEdges} onConnect={s.connect} onNodeClick={(_,n)=>s.select(n.id)} fitView minZoom={.1} maxZoom={2} deleteKeyCode="Delete" multiSelectionKeyCode="Shift"><MiniMap/><Controls/><Background/></ReactFlow>
   </div><ParameterPanel/></div><div className="run-log">运行日志 · 状态变化通过 SSE 实时推送，可在任务中心查看详情</div>
  </div>
