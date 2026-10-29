@@ -183,6 +183,10 @@ export const PARAM_LABELS: Record<string, string> = {
   similarity: '颜色容差',
   blend: '边缘羽化',
   fps: '目标帧率',
+  operation: '文本操作', source_mode: '来源模式', grid_type: '宫格类型', rows: '行数', cols: '列数', angle: '旋转角度',
+  x: '横坐标', y: '纵坐标', w: '区域宽', h: '区域高', reverse_audio: '同时倒放音频', speed: '播放倍速',
+  format: '音频格式', volume: '音量倍数', name: '名称', appearance: '形象名', voice_desc: '音色描述',
+  view_name: '视角名', scene_group: '场景分组',
 };
 
 export function paramLabel(key: string): string {

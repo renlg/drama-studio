@@ -1,4 +1,4 @@
-import {Empty,Form,Input,InputNumber,Select,Switch,Tabs,Typography,Tag} from 'antd';
+import {ColorPicker,Empty,Form,Input,InputNumber,Select,Space,Switch,Tabs,Typography,Tag} from 'antd';
 import {useWorkflow} from '../store/workflow';
 import {useCatalog,paramLabel} from '../store/catalog';
 import type {CatalogDef,CatalogParam} from '../store/catalog';
@@ -6,6 +6,15 @@ import {EpisodeAssetsOutput} from './EpisodeOverviewNode';
 import NodeAssetsOutput from './NodeAssetsOutput';
 
 type Row=[string,CatalogParam|undefined,unknown];
+
+const PARAM_TOOL_MAP:Record<string,Record<string,string[]>>={
+  TEXT:{prompt:['生成','扩写','润色','改写','续写'],system_prompt:['生成','扩写','润色','改写','续写'],negative_prompt:['生成','扩写','润色','改写','续写'],temperature:['生成','扩写','润色','改写','续写'],max_tokens:['生成','扩写','润色','改写','续写'],output_format:['生成','扩写','润色','改写','续写']},
+  IMAGE:{prompt:['文生图','图生图','宫格生成'],negative_prompt:['文生图','图生图','宫格生成'],width:['文生图','图生图','裁剪','宫格生成'],height:['文生图','图生图','裁剪','宫格生成'],seed:['文生图','图生图','宫格生成'],steps:['文生图','图生图','宫格生成'],cfg_scale:['文生图','图生图','宫格生成'],image_strength:['图生图'],output_count:['文生图','图生图'],key_color:['抠图'],similarity:['抠图'],blend:['抠图'],output_format:['抠图'],x:['裁剪'],y:['裁剪'],angle:['旋转'],rows:['宫格切分','宫格生成'],cols:['宫格切分','宫格生成'],grid_type:['宫格生成']},
+  VIDEO:{prompt:['文生视频','图生视频','智能多帧'],negative_prompt:['文生视频','图生视频'],mode:['文生视频'],duration_sec:['文生视频','图生视频'],resolution:['文生视频','图生视频'],aspect_ratio:['文生视频','智能多帧'],first_frame_url:['图生视频'],seed:['文生视频'],camera_movement:['图生视频'],output_count:['图生视频'],shot_duration_sec:['智能多帧'],max_shots:['智能多帧'],transition:['拼接'],transition_duration:['拼接'],reencode:['拼接','截取'],output_name:['拼接'],start_sec:['截取'],end_sec:['截取'],angle:['旋转'],reverse_audio:['倒放'],speed:['倍速'],fps:['补帧'],interpolation_mode:['补帧'],width:['分辨率调整'],height:['分辨率调整'],fit:['分辨率调整'],pad_color:['分辨率调整'],extract_mode:['抽帧'],at_sec:['抽帧'],every_n_sec:['抽帧'],max_frames:['抽帧'],x:['去字幕'],y:['去字幕'],w:['去字幕'],h:['去字幕'],format:['音频分离'],audio_volume:['配音配乐'],keep_original_audio:['配音配乐'],audio_offset_sec:['配音配乐'],shortest:['配音配乐']},
+  AUDIO:{files:['上传'],description:['上传'],start_sec:['截取'],end_sec:['截取'],volume:['音量调整']},
+  CHARACTER:{name:['生成','上传'],appearance:['生成'],description:['生成','上传'],voice_desc:['生成','上传'],prompt:['生成'],files:['上传']},
+  SCENE:{name:['生成','上传'],view_name:['生成'],description:['生成','上传'],scene_group:['生成','上传'],prompt:['生成'],files:['上传']},
+};
 
 /** 输入来源徽标：让用户知道这个值从哪来（PRD 硬约束：用户覆盖 > 上游 > 模板默认） */
 function SourceTag({source}:{source?:string}){
@@ -64,7 +73,9 @@ export default function ParameterPanel(){
 
   const def:CatalogDef|undefined=catalog.defs[n.type??''];
   const config:Record<string,unknown>=n.data.config??{};
-  const rows:Row[]=buildRows(def,config);
+  const currentTool=String(config.tool??def?.params.tool?.defaultValue??'');
+  const scoped=PARAM_TOOL_MAP[n.type??'']??{};
+  const rows:Row[]=buildRows(def,config).filter(([key])=>key==='tool'||!scoped[key]||scoped[key].includes(currentTool));
 
   const bySource=(src:string)=>{const out:Row[]=[];for(const r of rows){if(r[1]?.source===src)out.push(r);}return out;};
   const userRows=bySource('USER');
@@ -88,8 +99,9 @@ export default function ParameterPanel(){
 
   return (
     <aside className="parameter-panel">
-      <Typography.Title level={4} style={{marginBottom:4}}>{n.data.name}</Typography.Title>
+      <Space style={{justifyContent:'space-between',width:'100%'}}><Typography.Title level={4} style={{marginBottom:4}}>{n.data.name}</Typography.Title><ColorPicker value={n.data.colorTag||'var(--ds-text-muted)'} presets={[{label:'标签',colors:['var(--ds-error)','var(--ds-warning)','var(--ds-success)','var(--ds-running)','var(--ds-accent)','var(--ds-text-muted)']}]} onChange={(_,hex)=>s.updateData(n.id,{colorTag:hex})}/></Space>
       <Typography.Text type="secondary" style={{fontSize:12}}>{n.type} · 共 {rows.length} 个参数</Typography.Text>
+      {def?.params.tool&&<div className="tool-selector"><Typography.Text>当前工具</Typography.Text><Field def={def.params.tool} value={currentTool} onChange={x=>s.updateConfig(n.id,'tool',x)}/></div>}
       <Tabs
         style={{marginTop:8}}
         items={[

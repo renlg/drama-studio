@@ -154,17 +154,16 @@ public class PromptBuilder {
           + str(config.getOrDefault("background", "纯白背景")) + "；"
           + str(config.getOrDefault("composition", "产品设定图，多角度")) + "；无人物、无文字、无水印。";
 
-      case "TEXT_GEN" -> str(config.get("prompt"))
+      case "TEXT" -> "执行文本操作：" + str(config.getOrDefault("tool", "生成")) + "。\n" + str(config.get("prompt"))
           + "\n直接输出成品，不要复述需求。总字数严格控制在 800 字以内。"
           + ("JSON".equalsIgnoreCase(str(config.get("output_format"))) ? "仅输出合法 JSON，不要 markdown。" : "");
 
-      case "GENERIC_LLM" -> str(config.get("user_prompt"));
+      case "IMAGE", "CHARACTER", "SCENE" -> "宫格生成".equals(str(config.get("tool")))
+          ? "生成" + str(config.getOrDefault("grid_type", "宫格")) + "中的一个独立画面，保持主体和风格一致。" + str(config.get("prompt"))
+          : str(config.getOrDefault("prompt",config.get("description")));
 
-      case "IMAGE_GEN" -> str(config.get("prompt"));
-
-      case "VIDEO_GEN", "VIDEO_MULTI_KEYFRAME" -> str(config.get("prompt"));
-
-      case "IMAGE_TO_VIDEO" -> {
+      case "VIDEO" -> {
+        if(!"图生视频".equals(str(config.get("tool"))))yield str(config.get("prompt"));
         Object prompt = config.get("motion_prompt");
         yield (prompt == null || String.valueOf(prompt).isBlank()
                 ? "镜头缓慢推进，人物微动，环境光影自然流动"
@@ -185,7 +184,7 @@ public class PromptBuilder {
     if (nodeType.equals("STORYBOARD_IMAGE")) {
       collectSelected(projectId, "CHARACTER_REFERENCE_IMAGE", resolved, config);
       collectSelected(projectId, "SCENE_REFERENCE_IMAGE", resolved, config);
-    } else if (nodeType.equals("IMAGE_TO_VIDEO")) {
+    } else if (nodeType.equals("VIDEO") && "图生视频".equals(str(config.get("tool")))) {
       collectSelected(projectId, "STORYBOARD_IMAGE", resolved, config);
     }
     return resolved.values().stream().filter(a -> a.storageKey != null && !a.storageKey.isBlank())
