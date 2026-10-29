@@ -3,6 +3,7 @@ import com.dramastudio.entity.Asset; import java.util.*; import org.springframew
 public interface AssetRepository extends JpaRepository<Asset,String>{
  List<Asset> findByProjectIdAndDeletedAtIsNullOrderByCreatedAtDesc(String projectId);
  List<Asset> findByNodeRunIdOrderByCreatedAtDesc(String nodeRunId);
+ List<Asset> findByProjectIdAndLogicalKeyAndDeletedAtIsNullOrderByVersionNoDesc(String projectId,String logicalKey);
  Optional<Asset> findFirstByProjectIdAndLogicalKeyOrderByVersionNoDesc(String p,String k);
  Optional<Asset> findFirstByProjectIdAndAssetTypeOrderByVersionNoDesc(String p,String assetType);
  List<Asset> findByProjectIdAndAssetTypeAndDeletedAtIsNullOrderByCreatedAtDesc(String p,String assetType);

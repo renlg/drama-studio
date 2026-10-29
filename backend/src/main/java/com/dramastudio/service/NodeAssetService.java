@@ -23,7 +23,8 @@ public class NodeAssetService {
      "EPISODE_SCRIPT","SHOT_CARD_LIST","PROJECT_STATE","OUTLINE","CHARACTER_CARD_LIST",
      "STORYBOARD_SCRIPT","EPISODE_OVERVIEW","PROJECT_SETUP");
  private static final Set<String> IMAGE=Set.of(
-     "STORYBOARD_IMAGE","CHARACTER_REFERENCE_IMAGE","SCENE_REFERENCE_IMAGE","PROP_REFERENCE_IMAGE");
+     "IMAGE","CHARACTER","SCENE","STORYBOARD_IMAGE","CHARACTER_REFERENCE_IMAGE","SCENE_REFERENCE_IMAGE","PROP_REFERENCE_IMAGE");
+ private static final Set<String> VIDEO=Set.of("VIDEO","SHOT_VIDEO");
 
  private final AssetRepository assets;
  private final NodeRunRepository nodeRuns;
@@ -54,6 +55,10 @@ public class NodeAssetService {
     if(old==null||better(asset,old))chosen.put(asset.logicalKey,asset);
    }
   }
+  for(Asset asset:assets.findByProjectIdAndLogicalKeyAndDeletedAtIsNullOrderByVersionNoDesc(projectId,"node-upload:"+nodeId)){
+   Asset old=chosen.get(asset.logicalKey);
+   if(old==null||better(asset,old))chosen.put(asset.logicalKey,asset);
+  }
 
   List<NodeAsset> out=new ArrayList<>();
   chosen.values().stream()
@@ -67,12 +72,12 @@ public class NodeAssetService {
   return candidate.versionNo>current.versionNo;
  }
 
- private NodeAsset toDto(Asset a){
+ public NodeAsset toDto(Asset a){
   String preview=null,thumbnail=null,play=null,text=null;
   boolean image=IMAGE.contains(a.assetType);
   if(image&&a.storageKey!=null)preview=signer.sign(a.id,Duration.ofDays(7).toMillis());
   if(image&&a.thumbnailKey!=null)thumbnail=signer.sign(a.id,"thumb",Duration.ofDays(7).toMillis());
-  if("SHOT_VIDEO".equals(a.assetType)&&a.storageKey!=null)play=signer.sign(a.id,Duration.ofDays(7).toMillis());
+  if(VIDEO.contains(a.assetType)&&a.storageKey!=null)play=signer.sign(a.id,Duration.ofDays(7).toMillis());
   if(a.contentText!=null&&!a.contentText.isBlank())text=a.contentText;
   return new NodeAsset(a.id,a.assetType,a.name,a.logicalKey,a.contentStatus,
       a.selected,a.locked,a.versionNo,preview,thumbnail,play,text,a.createdAt);

@@ -7,8 +7,7 @@ class WorkflowOutputTypeTest {
   assertThat(WorkflowExecutor.outputType("TEXT","生成")).isEqualTo("TEXT");
   assertThat(WorkflowExecutor.outputType("IMAGE","抠图")).isEqualTo("IMAGE");
   assertThat(WorkflowExecutor.outputType("VIDEO","文生视频")).isEqualTo("VIDEO");
-  assertThat(WorkflowExecutor.outputType("VIDEO","抽帧")).isEqualTo("IMAGE");
-  assertThat(WorkflowExecutor.outputType("VIDEO","音频分离")).isEqualTo("AUDIO");
+  assertThat(WorkflowExecutor.outputType("VIDEO","图生视频")).isEqualTo("VIDEO");
   assertThat(WorkflowExecutor.outputType("AUDIO","截取")).isEqualTo("AUDIO");
  }
  @Test void resolvesRuntimeCapabilities(){

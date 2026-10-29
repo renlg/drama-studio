@@ -32,18 +32,11 @@ public final class NodeCatalog {
         "rows",p("int",3,true,"USER"),"cols",p("int",3,true,"USER"),"grid_type",pe("三视图","USER","三视图","表情九宫格","四宫格","九宫格")));
 
     add("VIDEO","视频节点","RUNTIME","VIDEO",ports(port("refs","ASSET_REF_LIST",false,true),port("chars","CHARACTER",false,true),port("scenes","SCENE",false,true),port("audios","AUDIO_ASSET_LIST",false,true)),ports(port("videos","VIDEO_ASSET_LIST",true,true)),params(
-        "tool",pe("文生视频","USER","文生视频","图生视频","智能多帧","拼接","截取","旋转","倒放","倍速","补帧","分辨率调整","抽帧","去字幕","音频分离","配音配乐"),
-        "prompt",p("textarea","",true,"USER"),"negative_prompt",p("textarea","",true,"USER"),"mode",pe("text","DEFAULT","text","keyframe","reference"),
-        "duration_sec",p("decimal",5,true,"DEFAULT"),"resolution",pe("720P","DEFAULT","720P"),"aspect_ratio",pe("9:16","DEFAULT","9:16","16:9","1:1"),
-        "first_frame_url",p("string","",true,"UPSTREAM"),"seed",p("long",null,true,"DEFAULT"),"camera_movement",p("string","轻微推进",true,"DEFAULT"),"output_count",p("int",1,true,"DEFAULT"),
-        "shot_duration_sec",p("int",5,true,"DEFAULT"),"max_shots",p("int",5,true,"DEFAULT"),"transition",pe("none","DEFAULT","none","fade"),
-        "transition_duration",p("decimal",0.5,true,"DEFAULT"),"reencode",p("boolean",true,true,"DEFAULT"),"output_name",p("string","merged",true,"DEFAULT"),
-        "start_sec",p("decimal",0,true,"DEFAULT"),"end_sec",p("decimal",null,true,"DEFAULT"),"angle",pe(90,"USER",90,180,270),"reverse_audio",p("boolean",true,true,"USER"),
-        "speed",p("decimal",1.0,true,"USER"),"fps",p("int",30,true,"DEFAULT"),"interpolation_mode",pe("mci","DEFAULT","dup","blend","mci"),
-        "width",p("int",720,true,"DEFAULT"),"height",p("int",1280,true,"DEFAULT"),"fit",pe("cover","DEFAULT","contain","cover","stretch"),"pad_color",p("string","#000000",true,"DEFAULT"),
-        "extract_mode",pe("single","DEFAULT","single","first","last","every_n"),"at_sec",p("decimal",0,true,"DEFAULT"),"every_n_sec",p("decimal",2,true,"DEFAULT"),"max_frames",p("int",10,true,"DEFAULT"),
-        "x",p("int",0,true,"USER"),"y",p("int",0,true,"USER"),"w",p("int",300,true,"USER"),"h",p("int",80,true,"USER"),"format",pe("m4a","USER","m4a","mp3","wav"),
-        "audio_volume",p("decimal",1.0,true,"DEFAULT"),"keep_original_audio",p("boolean",false,true,"DEFAULT"),"audio_offset_sec",p("decimal",0,true,"DEFAULT"),"shortest",p("boolean",true,true,"DEFAULT")));
+        "tool",pe("文生视频","USER","文生视频","图生视频"),
+        "prompt",p("textarea","",true,"USER"),"negative_prompt",p("textarea","",true,"USER"),
+        "model",pe("video-free","USER","video-free","agnes-video-2.5-flash","agnes-video-v2.0","grok-imagine-video","grok-imagine-video-1.5"),
+        "aspect_ratio",pe("9:16","USER","9:16","16:9","1:1"),"duration_sec",p("int",5,true,"USER"),
+        "first_frame_url",p("string","",true,"UPSTREAM")));
 
     add("AUDIO","音频节点","RUNTIME","AUDIO",ports(port("refs","ASSET_REF_LIST",false,true)),ports(port("audios","AUDIO_ASSET_LIST",true,true)),params(
         "tool",pe("上传","USER","上传","截取","音量调整"),"files",p("assetRef[]",List.of(),true,"USER"),"description",p("textarea","",true,"USER"),

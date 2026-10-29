@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import ReactFlow,{Background,BackgroundVariant,MiniMap,Panel,ReactFlowProvider,type Edge,type Node,type ReactFlowInstance} from 'reactflow';
+import ReactFlow,{Background,BackgroundVariant,MiniMap,Panel,ReactFlowProvider,type Connection,type Edge,type Node,type ReactFlowInstance} from 'reactflow';
 import dagre from '@dagrejs/dagre';
 import {AutoComplete,Button,Dropdown,Input,Modal,Select,Space,Switch,Tooltip,Typography,message} from 'antd';
 import {AimOutlined,AppstoreAddOutlined,CloudUploadOutlined,EyeInvisibleOutlined,ExpandOutlined,PlayCircleOutlined,RedoOutlined,SaveOutlined,SearchOutlined,UndoOutlined} from '@ant-design/icons';
@@ -8,10 +8,12 @@ import {api} from '../api/client';
 import NodeLibrary from '../components/NodeLibrary';
 import ParameterPanel from '../components/ParameterPanel';
 import DramaNode from '../components/DramaNode';
+import NodeGenerateModal from '../components/NodeGenerateModal';
 import {useWorkflow} from '../store/workflow';
 import {useCatalog,defaultConfig} from '../store/catalog';
 import {newId} from '../utils/uuid';
 import type {CanvasNodeData} from '../types';
+import {canConnect} from '../utils/portCompat';
 
 const nodeTypes={default:DramaNode};
 type Toolbox={id:string;name:string;nodes:Node<CanvasNodeData>[];edges:Edge[]};
@@ -29,9 +31,10 @@ function Canvas(){
  useEffect(()=>{if(s.viewport&&rf.current)rf.current.setViewport(s.viewport)},[s.viewport]);
  const save=useCallback(async()=>{const {data}=await api.put(`/workflows/${workflowId}`,{revision:s.revision,canvas:{schemaVersion:'1.0',viewport:rf.current?.getViewport(),nodes:s.nodes,edges:s.edges}});s.markSaved(data.revision)},[s.nodes,s.edges,s.revision,workflowId]);
  useEffect(()=>{if(!s.dirty)return;const t=setTimeout(()=>save().catch(()=>message.error('自动保存失败')),2000);return()=>clearTimeout(t)},[s.dirty,s.nodes,s.edges]);
- const run=async()=>{await save();const {data}=await api.post(`/workflows/${workflowId}/runs`,{});message.success(`任务已提交 ${data.id}`)};
+ const run=async(mode='all')=>{if(mode!=='all'&&!s.selectedId){message.warning('请先选择目标节点');return}await save();const {data}=await api.post(`/workflows/${workflowId}/runs`,{mode,targetNodeIds:mode==='all'?[]:[s.selectedId]});message.success(`任务已提交 ${data.id}`)};
  const categories=Object.values(cat.defs).filter(d=>(d.label+d.type).toLowerCase().includes(nodeQuery.toLowerCase())).reduce<Record<string,typeof cat.defs[string][]>>((all,d)=>{(all[d.category]??=[]).push(d);return all},{});
  const addNode=(type:string)=>{const def=cat.defs[type];if(!def||!addAt)return;s.addNode({id:newId(),type,position:addAt,data:{name:def.label??type,config:defaultConfig(def)}});setAddAt(undefined);setNodeQuery('')};
+ const connect=useCallback((connection:Connection)=>{const source=s.nodes.find(n=>n.id===connection.source),target=s.nodes.find(n=>n.id===connection.target);const sd=cat.defs[source?.type??''],td=cat.defs[target?.type??''];const outPorts=sd?.outputs??[],inPorts=td?.inputs??[];if(!outPorts.length||!inPorts.length)return;const output=outPorts.find(p=>p.name===connection.sourceHandle)??outPorts[0];const input=inPorts.find(p=>p.name===connection.targetHandle)??inPorts.find(p=>canConnect(output.type,p.type))??inPorts[0];if(!canConnect(output.type,input.type)){message.warning('端口类型不兼容');return}s.connect({...connection,sourceHandle:output.name,targetHandle:input.name})},[s.nodes,s.connect,cat.defs]);
  const arrange=()=>{if(s.nodes.some(n=>!n.width||n.width<=0||!n.height||n.height<=0)){message.warning('节点尚未完成尺寸测量，请稍后重试');return}const g=new dagre.graphlib.Graph().setDefaultEdgeLabel(()=>({}));g.setGraph({rankdir:'LR',ranksep:90,nodesep:50});s.nodes.forEach(n=>g.setNode(n.id,{width:n.width!,height:n.height!}));s.edges.forEach(e=>g.setEdge(e.source,e.target));dagre.layout(g);s.replaceNodes(s.nodes.map(n=>{const p=g.node(n.id);return{...n,position:{x:p.x-n.width!/2,y:p.y-n.height!/2}}}));setTimeout(()=>rf.current?.fitView({duration:350}),0)};
  const visibleIds=new Set(subjectsOnly?s.nodes.filter(n=>n.type==='CHARACTER'||n.type==='SCENE').map(n=>n.id):s.nodes.map(n=>n.id));
  const renderedNodes=s.nodes.map(n=>({...n,type:'default',data:{...n.data,nodeType:n.type},hidden:!visibleIds.has(n.id)}));
@@ -45,12 +48,12 @@ function Canvas(){
   <div className="canvas-toolbar"><Space>
    <Button icon={<UndoOutlined/>} onClick={s.undo} disabled={!s.past.length}/><Button icon={<RedoOutlined/>} onClick={s.redo} disabled={!s.future.length}/>
    <Button icon={<SaveOutlined/>} onClick={save}>保存</Button><Button icon={<CloudUploadOutlined/>} onClick={()=>api.post(`/workflows/${workflowId}/publish`).then(()=>message.success('已发布'))}>发布</Button>
-   <Dropdown.Button type="primary" icon={<PlayCircleOutlined/>} onClick={run} menu={{items:[{key:'all',label:'运行全部'},{key:'to',label:'运行到此节点'},{key:'only',label:'仅运行此节点'},{key:'rerun',label:'从此节点重跑'}]}}>运行</Dropdown.Button>
+   <Dropdown.Button type="primary" icon={<PlayCircleOutlined/>} onClick={()=>run('all')} menu={{onClick:({key})=>run(key==='rerun'?'from':key),items:[{key:'all',label:'运行全部'},{key:'to',label:'运行到此节点'},{key:'only',label:'仅运行此节点'},{key:'rerun',label:'从此节点重跑'}]}}>运行</Dropdown.Button>
    <Button icon={<SearchOutlined/>} onClick={()=>setSearchOpen(true)}>搜索</Button><Button icon={<AppstoreAddOutlined/>} onClick={()=>{setToolboxOpen(true);loadToolboxes()}}>工具箱</Button>
    <Button onClick={()=>nav(`/projects/${projectId}/assets`)}>资产库</Button>
   </Space><span>{s.dirty?'有未保存修改':'已同步'}</span></div>
   <div className="canvas-body"><NodeLibrary/><div className="flow" onDoubleClick={e=>{if(!(e.target as HTMLElement).classList.contains('react-flow__pane')||!rf.current)return;setAddAt(rf.current.screenToFlowPosition({x:e.clientX,y:e.clientY}))}} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const type=e.dataTransfer.getData('node/type'),def=cat.defs[type];if(!def||!rf.current)return message.error('节点类型未加载，请刷新页面重试');const p=rf.current.screenToFlowPosition({x:e.clientX,y:e.clientY});s.addNode({id:newId(),type,position:p,data:{name:def.label??type,config:defaultConfig(def)}})}}>
-   <ReactFlow nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} onInit={x=>{rf.current=x;if(s.viewport)x.setViewport(s.viewport);else x.fitView()}} onMove={(_,v)=>setZoom(Math.round(v.zoom*100))} onNodesChange={s.changeNodes} onEdgesChange={s.changeEdges} onConnect={s.connect} onNodeClick={(_,n)=>s.select(n.id)} onNodeDoubleClick={(_,n)=>openEditor(n as Node<CanvasNodeData>)} {...(!s.viewport?{fitView:true}:{})} minZoom={.05} maxZoom={4} panOnScroll={touchpad} zoomOnScroll={!touchpad} zoomOnPinch snapToGrid={snap} snapGrid={[20,20]} zoomOnDoubleClick={false} selectionOnDrag panOnDrag deleteKeyCode={['Delete','Backspace']} multiSelectionKeyCode="Shift">
+   <ReactFlow nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} onInit={x=>{rf.current=x;if(s.viewport)x.setViewport(s.viewport);else x.fitView()}} onMove={(_,v)=>setZoom(Math.round(v.zoom*100))} onNodesChange={s.changeNodes} onEdgesChange={s.changeEdges} onConnect={connect} onNodeClick={(_,n)=>{s.select(n.id);s.openGenerate(n.id)}} onNodeDoubleClick={(_,n)=>openEditor(n as Node<CanvasNodeData>)} {...(!s.viewport?{fitView:true}:{})} minZoom={.05} maxZoom={4} panOnScroll={touchpad} zoomOnScroll={!touchpad} zoomOnPinch snapToGrid={snap} snapGrid={[20,20]} zoomOnDoubleClick={false} selectionOnDrag panOnDrag deleteKeyCode={['Delete','Backspace']} multiSelectionKeyCode="Shift">
     <MiniMap pannable zoomable className="dark-minimap" nodeColor="var(--ds-node-border)" nodeStrokeColor="var(--ds-node-border-hover)" maskColor="var(--ds-minimap-mask)"/>
     <Panel position="bottom-left" className="viewport-controls"><Space size={4} wrap>
      <Tooltip title="重置视角"><Button size="small" icon={<ExpandOutlined/>} onClick={()=>rf.current?.fitView({duration:300})}/></Tooltip>
@@ -65,6 +68,7 @@ function Canvas(){
   <Modal title="搜索节点" open={searchOpen} footer={null} onCancel={()=>setSearchOpen(false)}><Space.Compact style={{width:'100%',marginBottom:12}}><Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="按名称或内容搜索"/><Select allowClear value={searchType} onChange={setSearchType} placeholder="类型" style={{width:180}} options={Object.values(cat.defs).map(d=>({value:d.type,label:d.label}))}/></Space.Compact><div className="search-results">{matches.map(n=><Button block key={n.id} icon={<AimOutlined/>} onClick={()=>{rf.current?.setCenter(n.position.x+(n.width||210)/2,n.position.y+(n.height||100)/2,{zoom:1.2,duration:350});s.select(n.id);setSearchOpen(false)}}>{n.data.name} · {cat.defs[n.type??'']?.label}</Button>)}</div></Modal>
   <Modal title="放大编辑文本" open={!!editorId} onCancel={()=>setEditorId(undefined)} onOk={()=>{if(editorId)s.updateConfig(editorId,'prompt',editorValue);setEditorId(undefined)}} width="80vw"><Input.TextArea value={editorValue} onChange={e=>setEditorValue(e.target.value)} style={{height:'80vh',resize:'none'}}/></Modal>
   <Modal title="工具箱" open={toolboxOpen} footer={null} onCancel={()=>setToolboxOpen(false)}><Typography.Text>Shift 多选节点后保存为可复用组合</Typography.Text><Space.Compact style={{width:'100%',margin:'12px 0'}}><Input value={toolboxName} onChange={e=>setToolboxName(e.target.value)} placeholder="工具箱名称"/><Button type="primary" disabled={!toolboxName.trim()} onClick={saveToolbox}>添加到工具箱</Button></Space.Compact><div className="toolbox-list">{toolboxes.map(box=><Button block key={box.id} onClick={()=>applyToolbox(box)}>{box.name} · {box.nodes.length} 个节点</Button>)}</div></Modal>
+  <NodeGenerateModal/>
  </div>
 }
 export default function WorkflowPage(){return <ReactFlowProvider><Canvas/></ReactFlowProvider>}

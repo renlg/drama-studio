@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB
   datasource:
     url: jdbc:sqlite:${DRAMA_DB_PATH:./data/drama-studio.db}?journal_mode=WAL&busy_timeout=5000&foreign_keys=on
     driver-class-name: org.sqlite.JDBC

@@ -203,7 +203,8 @@ public class AiConnectAdapters {
         try {
           Map<String, Object> body = new LinkedHashMap<>();
           List<String> refs = r.referenceImageUrls();
-          body.put("model", refs.isEmpty() ? imageModel : imageToImageModel);
+          String reqModel = r.params().get("model") instanceof String s && !s.isBlank() ? s : (refs.isEmpty() ? imageModel : imageToImageModel);
+          body.put("model", reqModel);
           body.put("prompt", r.prompt());
           // ai-connect 图片接口强制 n=1（实测传 n>1 直接 400 "n 必须为 1"）。
           // output_count 由外层循环多次调用实现，这里恒传 1。
@@ -281,7 +282,8 @@ public class AiConnectAdapters {
       public ProviderProtocol.Submission submit(ProviderProtocol.Request r) {
         try {
           Map<String, Object> body = new LinkedHashMap<>();
-          body.put("model", videoModel);
+          String reqModel = r.params().get("model") instanceof String s && !s.isBlank() ? s : videoModel;
+          body.put("model", reqModel);
           body.put("prompt", r.prompt());
           String mode = Objects.toString(r.params().get("mode"), "").trim();
           if (mode.isBlank()) mode = r.referenceImageUrls().isEmpty() ? "text" : "keyframe";

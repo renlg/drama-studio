@@ -1,117 +1,47 @@
-import {ColorPicker,Empty,Form,Input,InputNumber,Select,Space,Switch,Tabs,Typography,Tag} from 'antd';
+import {Button,Empty,Form,Image,Input,InputNumber,Select,Space,Tag,Typography,Upload,message} from 'antd';
+import {UploadOutlined} from '@ant-design/icons';
+import type {UploadRequestOption} from 'rc-upload/lib/interface';
+import {useQueryClient} from '@tanstack/react-query';
+import {useParams} from 'react-router-dom';
+import {api} from '../api/client';
 import {useWorkflow} from '../store/workflow';
 import {useCatalog,paramLabel} from '../store/catalog';
-import type {CatalogDef,CatalogParam} from '../store/catalog';
-import {EpisodeAssetsOutput} from './EpisodeOverviewNode';
-import NodeAssetsOutput from './NodeAssetsOutput';
+import type {CatalogParam} from '../store/catalog';
+import {useNodeAssets} from './NodeAssetsOutput';
+import {PARAM_TOOL_MAP} from '../utils/paramToolMap';
+import {isImageAsset,isVideoAsset} from '../utils/assetTypes';
 
-type Row=[string,CatalogParam|undefined,unknown];
+const VIDEO_KEYS=new Set(['model','aspect_ratio','duration_sec','negative_prompt']);
+const IMAGE_KEYS=new Set(['model','aspect_ratio','negative_prompt']);
+const SIMPLE_KEYS:Record<string,Set<string>>={TEXT:new Set(['prompt']),CHARACTER:new Set(['prompt','name','description']),SCENE:new Set(['prompt','name','description']),AUDIO:new Set(['prompt'])};
+const MODEL_LABELS:Record<string,string>={'video-free':'即梦通用（免费）','agnes-video-2.5-flash':'Agnes 2.5 Flash','agnes-video-v2.0':'Agnes 2.0','grok-imagine-video':'Grok Imagine','grok-imagine-video-1.5':'Grok Imagine 1.5'};
 
-const PARAM_TOOL_MAP:Record<string,Record<string,string[]>>={
-  TEXT:{prompt:['生成','扩写','润色','改写','续写'],system_prompt:['生成','扩写','润色','改写','续写'],negative_prompt:['生成','扩写','润色','改写','续写'],temperature:['生成','扩写','润色','改写','续写'],max_tokens:['生成','扩写','润色','改写','续写'],output_format:['生成','扩写','润色','改写','续写']},
-  IMAGE:{prompt:['文生图','图生图','宫格生成'],negative_prompt:['文生图','图生图','宫格生成'],width:['文生图','图生图','裁剪','宫格生成'],height:['文生图','图生图','裁剪','宫格生成'],seed:['文生图','图生图','宫格生成'],steps:['文生图','图生图','宫格生成'],cfg_scale:['文生图','图生图','宫格生成'],image_strength:['图生图'],output_count:['文生图','图生图'],key_color:['抠图'],similarity:['抠图'],blend:['抠图'],output_format:['抠图'],x:['裁剪'],y:['裁剪'],angle:['旋转'],rows:['宫格切分','宫格生成'],cols:['宫格切分','宫格生成'],grid_type:['宫格生成']},
-  VIDEO:{prompt:['文生视频','图生视频','智能多帧'],negative_prompt:['文生视频','图生视频'],mode:['文生视频'],duration_sec:['文生视频','图生视频'],resolution:['文生视频','图生视频'],aspect_ratio:['文生视频','智能多帧'],first_frame_url:['图生视频'],seed:['文生视频'],camera_movement:['图生视频'],output_count:['图生视频'],shot_duration_sec:['智能多帧'],max_shots:['智能多帧'],transition:['拼接'],transition_duration:['拼接'],reencode:['拼接','截取'],output_name:['拼接'],start_sec:['截取'],end_sec:['截取'],angle:['旋转'],reverse_audio:['倒放'],speed:['倍速'],fps:['补帧'],interpolation_mode:['补帧'],width:['分辨率调整'],height:['分辨率调整'],fit:['分辨率调整'],pad_color:['分辨率调整'],extract_mode:['抽帧'],at_sec:['抽帧'],every_n_sec:['抽帧'],max_frames:['抽帧'],x:['去字幕'],y:['去字幕'],w:['去字幕'],h:['去字幕'],format:['音频分离'],audio_volume:['配音配乐'],keep_original_audio:['配音配乐'],audio_offset_sec:['配音配乐'],shortest:['配音配乐']},
-  AUDIO:{files:['上传'],description:['上传'],start_sec:['截取'],end_sec:['截取'],volume:['音量调整']},
-  CHARACTER:{name:['生成','上传'],appearance:['生成'],description:['生成','上传'],voice_desc:['生成','上传'],prompt:['生成'],files:['上传']},
-  SCENE:{name:['生成','上传'],view_name:['生成'],description:['生成','上传'],scene_group:['生成','上传'],prompt:['生成'],files:['上传']},
-};
-
-/** 输入来源徽标：让用户知道这个值从哪来（PRD 硬约束：用户覆盖 > 上游 > 模板默认） */
-function SourceTag({source}:{source?:string}){
-  if(!source)return null;
-  const map:Record<string,{c:string;t:string}>={USER:{c:'blue',t:'用户'},UPSTREAM:{c:'purple',t:'上游'},DEFAULT:{c:'default',t:'默认'}};
-  const m=map[source];
-  if(!m)return null;
-  return <Tag color={m.c} style={{marginInlineStart:6}}>{m.t}</Tag>;
-}
-
-/** 按参数类型渲染控件 */
-function Field({def,value,onChange}:{def?:CatalogParam;value:unknown;onChange:(v:unknown)=>void}){
-  const t=def?.type??'string';
-
-  if(t==='boolean')return <Switch checked={Boolean(value)} onChange={onChange}/>;
-
-  if(t==='int'||t==='long')return <InputNumber style={{width:'100%'}} precision={0} value={value as number|undefined} onChange={onChange}/>;
-
-  if(t==='decimal')return <InputNumber style={{width:'100%'}} step={0.05} value={value as number|undefined} onChange={onChange}/>;
-
-  if(t==='enum'&&def?.options?.length)return <Select style={{width:'100%'}} value={value} options={def.options.map(x=>({value:x,label:String(x)}))} onChange={onChange}/>;
-  if(t==='enum')return <Input value={String(value??'')} onChange={e=>onChange(e.target.value)} placeholder="枚举值"/>;
-
-  if(t==='string[]')return <Select mode="tags" style={{width:'100%'}} value={(value as string[])??[]} onChange={onChange} placeholder="回车添加"/>;
-
-  if(t==='textarea')return <Input.TextArea autoSize={{minRows:3,maxRows:10}} value={String(value??'')} onChange={e=>onChange(e.target.value)}/>;
-
-  if(t==='assetRef')return <Input value={String(value??'')} onChange={e=>onChange(e.target.value)} placeholder="由上游自动填充"/>;
-
-  if(t==='assetRef[]')return <Input.TextArea autoSize={{minRows:2,maxRows:6}} value={Array.isArray(value)?value.join('\n'):String(value??'')} onChange={e=>onChange(e.target.value.split('\n').filter(Boolean))} placeholder="由上游自动填充"/>;
-
+function Field({name,def,value,onChange}:{name:string;def?:CatalogParam;value:unknown;onChange:(v:unknown)=>void}){
+  if(name==='duration_sec')return <InputNumber min={4} max={12} precision={0} addonAfter="秒" style={{width:'100%'}} value={Number(value??5)} onChange={onChange}/>;
+  if(def?.type==='enum'&&def.options?.length)return <Select style={{width:'100%'}} value={value} options={def.options.map(x=>({value:x,label:name==='model'?(MODEL_LABELS[String(x)]??String(x)):String(x)}))} onChange={onChange}/>;
+  if(def?.type==='int'||def?.type==='long'||def?.type==='decimal')return <InputNumber style={{width:'100%'}} value={value as number|undefined} onChange={onChange}/>;
+  if(def?.type==='textarea'||name==='prompt'||name==='negative_prompt'||name==='description')return <Input.TextArea rows={name==='prompt'?4:2} value={String(value??'')} onChange={e=>onChange(e.target.value)}/>;
   return <Input value={String(value??'')} onChange={e=>onChange(e.target.value)}/>;
 }
 
-function buildRows(def:CatalogDef|undefined,config:Record<string,unknown>):Row[]{
-  const out:Row[]=[];
-  if(def){
-    for(const k of Object.keys(def.params)){
-      const p=def.params[k];
-      out.push([k,p,config[k]!==undefined?config[k]:p.defaultValue]);
-    }
-    return out;
-  }
-  for(const k of Object.keys(config)){
-    out.push([k,undefined,config[k]]);
-  }
-  return out;
-}
-
 export default function ParameterPanel(){
-  const s=useWorkflow();
-  const catalog=useCatalog();
-  const n=s.nodes.find(x=>x.id===s.selectedId);
-
-  if(!n)return <aside className="parameter-panel"><Empty description="选择节点编辑参数"/></aside>;
-
-  const def:CatalogDef|undefined=catalog.defs[n.type??''];
-  const config:Record<string,unknown>=n.data.config??{};
-  const currentTool=String(config.tool??def?.params.tool?.defaultValue??'');
-  const scoped=PARAM_TOOL_MAP[n.type??'']??{};
-  const rows:Row[]=buildRows(def,config).filter(([key])=>key==='tool'||!scoped[key]||scoped[key].includes(currentTool));
-
-  const bySource=(src:string)=>{const out:Row[]=[];for(const r of rows){if(r[1]?.source===src)out.push(r);}return out;};
-  const userRows=bySource('USER');
-  const upRows=bySource('UPSTREAM');
-  const defRows:Row[]=[];for(const r of rows){if(!r[1]||r[1].source==='DEFAULT')defRows.push(r);}
-
-  const renderGroup=(list:Row[])=>(
-    <Form layout="vertical" size="small">
-      {list.map(([k,p,v])=>(
-        <Form.Item
-          key={k}
-          style={{marginBottom:12}}
-          label={<span>{paramLabel(k)}<SourceTag source={p?.source}/></span>}
-          extra={p?`${k} · ${p.type}`:k}
-        >
-          <Field def={p} value={v} onChange={x=>s.updateConfig(n.id,k,x)}/>
-        </Form.Item>
-      ))}
+  const {projectId}=useParams(),queryClient=useQueryClient(),s=useWorkflow(),catalog=useCatalog();
+  const n=s.nodes.find(x=>x.id===s.selectedId),{data,reload}=useNodeAssets(n?.id,false);
+  if(!n)return <aside className="parameter-panel"><Empty description="点击画布中的节点查看属性"/></aside>;
+  const def=catalog.defs[n.type??''],config=n.data.config??{},tool=String(config.tool??def?.params.tool?.defaultValue??'');
+  const scoped=PARAM_TOOL_MAP[n.type??'']??{},allowed=n.type==='VIDEO'?VIDEO_KEYS:n.type==='IMAGE'?IMAGE_KEYS:(SIMPLE_KEYS[n.type??'']??new Set<string>());
+  const keys=Object.keys(def?.params??{}).filter(k=>allowed.has(k)&&(!scoped[k]||scoped[k].includes(tool)));
+  const assets=data?.assets??[],canUpload=['IMAGE','CHARACTER','SCENE','VIDEO','AUDIO'].includes(n.type??'');
+  const accept=n.type==='VIDEO'?'video/*':n.type==='AUDIO'?'audio/*':'image/*',assetType=['CHARACTER','SCENE'].includes(n.type??'')?'IMAGE':n.type;
+  const upload=async({file,onSuccess,onError}:UploadRequestOption)=>{try{const body=new FormData();body.append('file',file as File);body.append('assetType',assetType??'IMAGE');await api.post(`/projects/${projectId}/nodes/${n.id}/upload`,body);message.success('上传成功');await reload();await queryClient.invalidateQueries({queryKey:['node-assets',projectId,n.id]});onSuccess?.({})}catch(e){message.error('上传失败');onError?.(e as Error)}};
+  return <aside className="parameter-panel">
+    <Input value={n.data.name} onChange={e=>s.updateData(n.id,{name:e.target.value})}/>
+    <Space style={{marginTop:8}}><Tag>{n.type}</Tag><Tag color={n.data.status==='FAILED'?'red':n.data.status==='RUNNING'?'blue':n.data.status==='SUCCEEDED'?'green':'default'}>{n.data.status||'PENDING'}</Tag></Space>
+    <div className="parameter-preview">{assets.length?assets.slice(0,4).map(a=>isImageAsset(a.assetType)?<Image key={a.id} src={a.thumbnailUrl||a.previewUrl}/>:isVideoAsset(a.assetType)?<video key={a.id} controls src={a.playUrl}/>:<Typography.Paragraph key={a.id}>{a.contentText||a.name}</Typography.Paragraph>):<Empty description="暂无产出"/>}</div>
+    <Space.Compact block>{canUpload&&<Upload accept={accept} showUploadList={false} customRequest={upload}><Button icon={<UploadOutlined/>} style={{width:'100%'}}>上传</Button></Upload>}<Button type="primary" style={{width:'100%'}} onClick={()=>s.openGenerate(n.id)}>✦ AI 生成</Button></Space.Compact>
+    <Form layout="vertical" size="small" style={{marginTop:16}}>
+      {def?.params.tool&&['VIDEO','IMAGE','CHARACTER','SCENE'].includes(n.type??'')&&<Form.Item label="工具"><Field name="tool" def={def.params.tool} value={tool} onChange={v=>s.updateConfig(n.id,'tool',v)}/></Form.Item>}
+      {keys.map(k=><Form.Item key={k} label={paramLabel(k)}><Field name={k} def={def?.params[k]} value={config[k]??def?.params[k]?.defaultValue} onChange={v=>s.updateConfig(n.id,k,v)}/></Form.Item>)}
     </Form>
-  );
-
-  return (
-    <aside className="parameter-panel">
-      <Space style={{justifyContent:'space-between',width:'100%'}}><Typography.Title level={4} style={{marginBottom:4}}>{n.data.name}</Typography.Title><ColorPicker value={n.data.colorTag||'var(--ds-text-muted)'} presets={[{label:'标签',colors:['var(--ds-error)','var(--ds-warning)','var(--ds-success)','var(--ds-running)','var(--ds-accent)','var(--ds-text-muted)']}]} onChange={(_,hex)=>s.updateData(n.id,{colorTag:hex})}/></Space>
-      <Typography.Text type="secondary" style={{fontSize:12}}>{n.type} · 共 {rows.length} 个参数</Typography.Text>
-      {def?.params.tool&&<div className="tool-selector"><Typography.Text>当前工具</Typography.Text><Field def={def.params.tool} value={currentTool} onChange={x=>s.updateConfig(n.id,'tool',x)}/></div>}
-      <Tabs
-        style={{marginTop:8}}
-        items={[
-          {key:'user',label:`用户 (${userRows.length})`,children:userRows.length?renderGroup(userRows):<Empty description="无用户参数"/>},
-          {key:'upstream',label:`上游 (${upRows.length})`,children:upRows.length?renderGroup(upRows):<Empty description="无上游参数"/>},
-          {key:'default',label:`默认 (${defRows.length})`,children:defRows.length?renderGroup(defRows):<Empty description="无默认参数"/>},
-          {key:'output',label:'输出',children:n.type==='EPISODE_OVERVIEW'?<EpisodeAssetsOutput episodeNumber={Number(config.episode_number)||1} autoRefresh={config.auto_refresh!==false}/>:<NodeAssetsOutput nodeId={n.id} autoRefresh={Boolean(config.auto_refresh)}/>},
-          {key:'history',label:'历史',children:<Empty description="暂无历史"/>},
-        ]}
-      />
-    </aside>
-  );
+  </aside>;
 }
