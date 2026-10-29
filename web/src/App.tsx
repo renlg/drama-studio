@@ -1,11 +1,12 @@
 import {App as AntApp,Button,Layout,Menu,Typography} from 'antd';
-import {AppstoreOutlined,BookOutlined,PlayCircleOutlined} from '@ant-design/icons';
+import {ApiOutlined,AppstoreOutlined,BookOutlined,PlayCircleOutlined} from '@ant-design/icons';
 import {Navigate,Route,Routes,useLocation,useNavigate} from 'react-router-dom';
 import ProjectsPage from './pages/ProjectsPage';
 import WorkflowPage from './pages/WorkflowPage';
 import AssetsPage from './pages/AssetsPage';
 import TasksPage from './pages/TasksPage';
 import TemplatesPage from './pages/TemplatesPage';
+import ModelProvidersPage from './pages/ModelProvidersPage';
 import LoginPage from './pages/LoginPage';
 import {BASE,clearToken,isLoggedIn,setToken} from './auth';
 
@@ -22,6 +23,7 @@ function Shell(){
     ['/projects',<AppstoreOutlined/>, '项目'],
     ['/tasks',<PlayCircleOutlined/>, '任务'],
     ['/templates',<BookOutlined/>, '模板'],
+    ['/model-providers',<ApiOutlined/>, '模型'],
   ].map(([key,icon,label])=>({key:key as string,icon,label}));
 
   return (
@@ -38,6 +40,7 @@ function Shell(){
           <Route path="/projects/:projectId/assets" element={<AssetsPage/>}/>
           <Route path="/tasks" element={<TasksPage/>}/>
           <Route path="/templates" element={<TemplatesPage/>}/>
+          <Route path="/model-providers" element={<ModelProvidersPage/>}/>
           <Route path="*" element={<Navigate to="/projects" replace/>}/>
         </Routes>
       </Layout.Content>

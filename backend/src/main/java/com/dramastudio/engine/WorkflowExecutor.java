@@ -3,6 +3,7 @@ package com.dramastudio.engine;
 import com.dramastudio.entity.*;
 import com.dramastudio.gateway.ProviderProtocol.*;
 import com.dramastudio.repository.*;
+import com.dramastudio.service.ModelProviderService;
 import com.dramastudio.storage.OssStorageService;
 import com.dramastudio.template.NodeCatalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,13 +29,15 @@ public class WorkflowExecutor {
   private final ObjectMapper json; private final LlmProviderAdapter llm; private final ImageProviderAdapter image;
   private final VideoProviderAdapter video; private final PromptBuilder prompts; private final OssStorageService storage;
   private final FfmpegService ffmpeg;
+  private final ModelProviderService providerService;
 
   public WorkflowExecutor(WorkflowRunRepository r,NodeRunRepository n,AssetRepository a,GateService g,
       RunEventHub e,ObjectMapper j,@Qualifier("mockLlm") LlmProviderAdapter mockL,
       @Qualifier("mockImage") ImageProviderAdapter mockI,@Qualifier("mockVideo") VideoProviderAdapter mockV,
       @Qualifier("aiConnectLlm") LlmProviderAdapter realL,@Qualifier("aiConnectImage") ImageProviderAdapter realI,
-      @Qualifier("aiConnectVideo") VideoProviderAdapter realV,PromptBuilder pb,OssStorageService storage,FfmpegService ffmpeg,Environment env){
-    runs=r;nodeRuns=n;assets=a;gates=g;events=e;json=j;prompts=pb;this.storage=storage;this.ffmpeg=ffmpeg;
+      @Qualifier("aiConnectVideo") VideoProviderAdapter realV,PromptBuilder pb,OssStorageService storage,FfmpegService ffmpeg,Environment env,
+      @org.springframework.beans.factory.annotation.Autowired(required=false) ModelProviderService providerService){
+    runs=r;nodeRuns=n;assets=a;gates=g;events=e;json=j;prompts=pb;this.storage=storage;this.ffmpeg=ffmpeg;this.providerService=providerService;
     String key=env.getProperty("app.aiconnect.api-key","");
     if(key!=null&&!key.isBlank()){llm=realL;image=realI;video=realV;log.info("Provider 模式: ai-connect");}
     else{llm=mockL;image=mockI;video=mockV;log.warn("Provider 模式: mock（未配置 AI_CONNECT_SK）");}
@@ -98,6 +101,20 @@ public class WorkflowExecutor {
       String prompt=prompts.build(type,cfg,run.projectId);nr.renderedPrompt=prompt;
       List<String> refs=referenceUrls(run,type,cfg);
       nodeRuns.save(nr);
+      // 节点级供应商解析：把 baseUrl / apiKey 塞进 params，适配器优先用它们（缺失则回落全局 env）
+      String providerId=Objects.toString(cfg.get("providerId"),null);
+      String wantModel=Objects.toString(cfg.get("model"),null);
+      if(providerService!=null){
+        try{
+          String cat="VIDEO".equals(type)?"VIDEO":"IMAGE".equals(capability)?"IMAGE":"AUDIO".equals(type)?"AUDIO":"TEXT";
+          ModelProviderService.Resolved pv=providerService.resolve(providerId,cat,wantModel);
+          if(pv!=null){
+            cfg.put("provider_base_url",pv.baseUrl());
+            if(pv.apiKey()!=null&&!pv.apiKey().isBlank())cfg.put("provider_api_key",pv.apiKey());
+            if(wantModel==null&&pv.modelId()!=null)cfg.put("model",pv.modelId());
+          }
+        }catch(Exception pe){log.warn("供应商解析失败，回落全局配置: {}",pe.getMessage());}
+      }
       Request request=new Request("ai-connect",prompt,Objects.toString(cfg.get("negative_prompt"),""),cfg,nr.idempotencyKey,refs);
       if("VIDEO".equals(type)&&"图生视频".equals(tool)){
         if(refs.isEmpty())throw new ProviderException(ErrorCode.CONTENT_REJECTED,"同分集没有已选择且已落 OSS 的分镜图");

@@ -21,7 +21,8 @@ public class NodeUploadService {
   projects.getOwned(projectId,user);
   if(file==null||file.isEmpty())throw new IllegalArgumentException("请选择上传文件");
   String mime=Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
-  String type=requestedType==null||requestedType.isBlank()?infer(mime):requestedType;
+  String inferred=infer(mime);
+  String type="GENERIC_OUTPUT".equals(inferred)&&requestedType!=null&&!requestedType.isBlank()?requestedType:inferred;
   String logicalKey="node-upload:"+nodeId;
   int version=assets.findFirstByProjectIdAndLogicalKeyOrderByVersionNoDesc(projectId,logicalKey).map(a->a.versionNo+1).orElse(1);
   String original=Optional.ofNullable(file.getOriginalFilename()).filter(x->!x.isBlank()).orElse("upload."+fallbackExt(mime));

@@ -66,13 +66,20 @@ public class AiConnectAdapters {
   }
 
   private JsonNode post(String path, Object body, Duration timeout) throws Exception {
+    return post(path, body, timeout, null, null);
+  }
+
+  /** 供应商级覆盖：params 里带 provider_base_url / provider_api_key 时优先使用。 */
+  private JsonNode post(String path, Object body, Duration timeout, String overrideBase, String overrideKey) throws Exception {
     String json = new ObjectMapper().writeValueAsString(body);
-    HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(baseUrl + path))
+    String useBase = overrideBase != null && !overrideBase.isBlank() ? overrideBase : baseUrl;
+    String useKey = overrideKey != null && !overrideKey.isBlank() ? overrideKey : apiKey;
+    HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(useBase + path))
         .timeout(timeout)
         .header("Content-Type", "application/json")
         .POST(HttpRequest.BodyPublishers.ofString(json));
-    if (apiKey != null && !apiKey.isBlank()) {
-      b.header("Authorization", "Bearer " + apiKey);
+    if (useKey != null && !useKey.isBlank()) {
+      b.header("Authorization", "Bearer " + useKey);
     }
     HttpResponse<String> resp = http().send(b.build(), HttpResponse.BodyHandlers.ofString());
     JsonNode node = new ObjectMapper().readTree(resp.body());
@@ -86,6 +93,17 @@ public class AiConnectAdapters {
           "ai-connect HTTP " + resp.statusCode() + ": " + msg);
     }
     return node;
+  }
+
+  /** 节点级供应商覆盖：从 params 取，未设置则回落全局配置。 */
+  private static String overrideBase(ProviderProtocol.Request r) {
+    Object v = r.params() == null ? null : r.params().get("provider_base_url");
+    return v instanceof String s && !s.isBlank() ? s : null;
+  }
+
+  private static String overrideKey(ProviderProtocol.Request r) {
+    Object v = r.params() == null ? null : r.params().get("provider_api_key");
+    return v instanceof String s && !s.isBlank() ? s : null;
   }
 
   private JsonNode get(String path, Duration timeout) throws Exception {
@@ -135,7 +153,7 @@ public class AiConnectAdapters {
           Object mt = r.params() == null ? null : r.params().get("max_tokens");
           body.put("max_tokens", mt instanceof Number ? ((Number) mt).intValue() : 8192);
 
-          JsonNode node = post("/chat/completions", body, Duration.ofMinutes(8));
+          JsonNode node = post("/chat/completions", body, Duration.ofMinutes(8), overrideBase(r), overrideKey(r));
           JsonNode choice = node.path("choices").path(0);
           String text = choice.path("message").path("content").asText("");
           if (text.isBlank()) {
@@ -219,7 +237,7 @@ public class AiConnectAdapters {
           body.put("size", size);
           if (!refs.isEmpty()) body.put("image", refs.get(0));
 
-          JsonNode node = post("/images/generations", body, Duration.ofMinutes(5));
+          JsonNode node = post("/images/generations", body, Duration.ofMinutes(5), overrideBase(r), overrideKey(r));
           JsonNode first = node.path("data").path(0);
           String url = first.path("url").asText(null);
           String b64 = first.path("b64_json").asText(null);
@@ -315,7 +333,7 @@ public class AiConnectAdapters {
           Exception last = null;
           for (int attempt = 1; attempt <= maxQueueRetries; attempt++) {
             try {
-              node = post("/videos", body, Duration.ofMinutes(2));
+              node = post("/videos", body, Duration.ofMinutes(2), overrideBase(r), overrideKey(r));
               last = null;
               break;
             } catch (Exception e) {

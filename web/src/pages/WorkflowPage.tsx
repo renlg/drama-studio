@@ -2,7 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import ReactFlow,{Background,BackgroundVariant,MiniMap,Panel,ReactFlowProvider,type Connection,type Edge,type Node,type ReactFlowInstance} from 'reactflow';
 import dagre from '@dagrejs/dagre';
 import {AutoComplete,Button,Dropdown,Input,Modal,Select,Space,Switch,Tooltip,Typography,message} from 'antd';
-import {AimOutlined,AppstoreAddOutlined,CloudUploadOutlined,EyeInvisibleOutlined,ExpandOutlined,PlayCircleOutlined,RedoOutlined,SaveOutlined,SearchOutlined,UndoOutlined} from '@ant-design/icons';
+import {AimOutlined,AppstoreAddOutlined,CopyOutlined,SnippetsOutlined,CloudUploadOutlined,EyeInvisibleOutlined,ExpandOutlined,PlayCircleOutlined,RedoOutlined,SaveOutlined,SearchOutlined,UndoOutlined,DownloadOutlined,UploadOutlined,BorderOuterOutlined} from '@ant-design/icons';
 import {useParams,useNavigate} from 'react-router-dom';
 import {api} from '../api/client';
 import NodeLibrary from '../components/NodeLibrary';
@@ -42,11 +42,37 @@ function Canvas(){
  const matches=s.nodes.filter(n=>(!searchType||n.type===searchType)&&(n.data.name+' '+n.type+' '+JSON.stringify(n.data.config)).toLowerCase().includes(search.toLowerCase()));
  const openEditor=(node:Node<CanvasNodeData>)=>{if(node.data.nodeType!=='TEXT')return;setEditorId(node.id);setEditorValue(String(node.data.config.prompt??''))};
  const loadToolboxes=()=>api.get('/toolboxes').then(({data})=>setToolboxes(data));
+ // 复制/粘贴：选中节点 + 内部连线
+ const doCopy=()=>{const n=s.copySelection();if(n)message.success(`已复制 ${n} 个节点`);else message.warning('请先选择节点');};
+ const doPaste=()=>{const n=s.pasteClipboard();if(n)message.success(`已粘贴 ${n} 个节点`);else message.warning('剪贴板为空');};
+ // 导出画布为 JSON 文件
+ const exportCanvas=()=>{const blob=new Blob([JSON.stringify({schemaVersion:'1.0',viewport:rf.current?.getViewport(),nodes:s.nodes,edges:s.edges},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`canvas-${workflowId??'export'}.json`;a.click();URL.revokeObjectURL(url);message.success('已导出画布 JSON')};
+ // 导入 JSON 到当前画布
+ const importRef=useRef<HTMLInputElement>(null);
+ const importCanvas=async(file:File)=>{try{const text=await file.text();const data=JSON.parse(text);if(!Array.isArray(data.nodes))throw new Error('缺少 nodes 数组');const map=new Map<string,string>();data.nodes.forEach((n:Node<CanvasNodeData>)=>map.set(n.id,newId()));const nodes=data.nodes.map((n:Node<CanvasNodeData>)=>({...n,id:map.get(n.id)!,selected:false}));const edges=(Array.isArray(data.edges)?data.edges:[]).map((e:Edge)=>({...e,id:newId(),source:map.get(e.source)??e.source,target:map.get(e.target)??e.target}));s.replaceCanvas([...s.nodes,...nodes],[...s.edges,...edges]);message.success(`已导入 ${nodes.length} 个节点`);setTimeout(()=>rf.current?.fitView({duration:350}),0)}catch(err){message.error('导入失败：'+(err as Error).message)}};
  const saveToolbox=async()=>{const chosen=s.nodes.filter(n=>n.selected);if(chosen.length<1){message.warning('请先选择一个或多个节点');return}const ids=new Set(chosen.map(n=>n.id)),minX=Math.min(...chosen.map(n=>n.position.x)),minY=Math.min(...chosen.map(n=>n.position.y));const nodes=chosen.map(n=>({...n,position:{x:n.position.x-minX,y:n.position.y-minY},selected:false}));const edges=s.edges.filter(e=>ids.has(e.source)&&ids.has(e.target));await api.post('/toolboxes',{name:toolboxName,nodes,edges});setToolboxName('');await loadToolboxes();message.success('已添加到工具箱')};
  const applyToolbox=(box:Toolbox)=>{const origin=rf.current?.screenToFlowPosition({x:window.innerWidth/2,y:window.innerHeight/2})??{x:100,y:100};const ids=new Map<string,string>();box.nodes.forEach(n=>ids.set(n.id,newId()));const nodes=box.nodes.map(n=>({...n,id:ids.get(n.id)!,position:{x:origin.x+n.position.x,y:origin.y+n.position.y},selected:false}));const edges=box.edges.map(e=>({...e,id:newId(),source:ids.get(e.source)!,target:ids.get(e.target)!}));s.addGroup(nodes,edges);setToolboxOpen(false);message.success('工具箱已应用，请补充素材和提示词')};
+ // 快捷键：Cmd/Ctrl+C 复制、+V 粘贴、+A 全选、+Z 撤销、+Shift+Z 重做、+S 保存
+ useEffect(()=>{
+  const onKey=(e:KeyboardEvent)=>{const el=e.target as HTMLElement;const typing=el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.isContentEditable);
+   const mod=e.metaKey||e.ctrlKey;
+   if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();save().then(()=>message.success('已保存')).catch(()=>message.error('保存失败'));return}
+   if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();if(e.shiftKey)s.redo();else s.undo();return}
+   if(mod&&e.key.toLowerCase()==='a'){e.preventDefault();s.selectAll();return}
+   if(typing)return;
+   if(mod&&e.key.toLowerCase()==='c'){e.preventDefault();doCopy();return}
+   if(mod&&e.key.toLowerCase()==='v'){e.preventDefault();doPaste();return}
+  };
+  window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
+ },[save,doCopy,doPaste,s]);
  return <div className="workflow-page">
   <div className="canvas-toolbar"><Space>
-   <Button icon={<UndoOutlined/>} onClick={s.undo} disabled={!s.past.length}/><Button icon={<RedoOutlined/>} onClick={s.redo} disabled={!s.future.length}/>
+   <Button icon={<UndoOutlined/>} onClick={s.undo} disabled={!s.past.length} title="撤销 ⌘Z"/><Button icon={<RedoOutlined/>} onClick={s.redo} disabled={!s.future.length} title="重做 ⇧⌘Z"/>
+   <Button icon={<CopyOutlined/>} onClick={doCopy} title="复制 ⌘C"/><Button icon={<SnippetsOutlined/>} onClick={doPaste} title="粘贴 ⌘V"/>
+   <Button icon={<BorderOuterOutlined/>} onClick={s.selectAll} title="全选 ⌘A"/>
+   <Button icon={<DownloadOutlined/>} onClick={exportCanvas} title="导出 JSON"/>
+   <Button icon={<UploadOutlined/>} onClick={()=>importRef.current?.click()} title="导入 JSON"/>
+   <input ref={importRef} type="file" accept="application/json,.json" style={{display:'none'}} onChange={e=>{const f=e.target.files?.[0];if(f)importCanvas(f);e.target.value=''}}/>
    <Button icon={<SaveOutlined/>} onClick={save}>保存</Button><Button icon={<CloudUploadOutlined/>} onClick={()=>api.post(`/workflows/${workflowId}/publish`).then(()=>message.success('已发布'))}>发布</Button>
    <Dropdown.Button type="primary" icon={<PlayCircleOutlined/>} onClick={()=>run('all')} menu={{onClick:({key})=>run(key==='rerun'?'from':key),items:[{key:'all',label:'运行全部'},{key:'to',label:'运行到此节点'},{key:'only',label:'仅运行此节点'},{key:'rerun',label:'从此节点重跑'}]}}>运行</Dropdown.Button>
    <Button icon={<SearchOutlined/>} onClick={()=>setSearchOpen(true)}>搜索</Button><Button icon={<AppstoreAddOutlined/>} onClick={()=>{setToolboxOpen(true);loadToolboxes()}}>工具箱</Button>
