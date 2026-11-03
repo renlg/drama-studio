@@ -23,7 +23,7 @@ public final class NodeCatalog {
         "system_prompt",p("textarea","你是专业内容创作者，直接输出成品，不要复述需求",true,"USER"),"negative_prompt",p("textarea","",true,"USER"),
         "temperature",p("decimal",0.7,true,"DEFAULT"),"max_tokens",p("int",4096,true,"DEFAULT"),"output_format",pe("TEXT","DEFAULT","TEXT","JSON")));
 
-    add("IMAGE","图片节点","RUNTIME","IMAGE",ports(port("refs","ASSET_REF_LIST",false,true),port("chars","CHARACTER",false,true),port("scenes","SCENE",false,true)),ports(port("images","IMAGE_ASSET_LIST",true,true)),params(
+    add("IMAGE","图片节点","RUNTIME","IMAGE",ports(port("text","TEXT",false,true),port("refs","ASSET_REF_LIST",false,true),port("chars","CHARACTER",false,true),port("scenes","SCENE",false,true)),ports(port("images","IMAGE_ASSET_LIST",true,true)),params(
         "tool",pe("文生图","USER","文生图","图生图","抠图","裁剪","旋转","宫格切分","宫格生成"),"prompt",p("textarea","",true,"USER"),
         "negative_prompt",p("textarea","different face, extra people, watermark, text",true,"USER"),"width",p("int",1024,true,"DEFAULT"),"height",p("int",1536,true,"DEFAULT"),
         "seed",p("long",null,true,"DEFAULT"),"steps",p("int",20,true,"DEFAULT"),"cfg_scale",p("decimal",7.0,true,"DEFAULT"),"image_strength",p("decimal",0.6,true,"DEFAULT"),
@@ -31,7 +31,7 @@ public final class NodeCatalog {
         "output_format",pe("png","DEFAULT","png","webp"),"x",p("int",0,true,"USER"),"y",p("int",0,true,"USER"),"angle",pe(90,"USER",90,180,270),
         "rows",p("int",3,true,"USER"),"cols",p("int",3,true,"USER"),"grid_type",pe("三视图","USER","三视图","表情九宫格","四宫格","九宫格")));
 
-    add("VIDEO","视频节点","RUNTIME","VIDEO",ports(port("refs","ASSET_REF_LIST",false,true),port("chars","CHARACTER",false,true),port("scenes","SCENE",false,true),port("audios","AUDIO_ASSET_LIST",false,true)),ports(port("videos","VIDEO_ASSET_LIST",true,true)),params(
+    add("VIDEO","视频节点","RUNTIME","VIDEO",ports(port("text","TEXT",false,true),port("refs","ASSET_REF_LIST",false,true),port("chars","CHARACTER",false,true),port("scenes","SCENE",false,true),port("audios","AUDIO_ASSET_LIST",false,true)),ports(port("videos","VIDEO_ASSET_LIST",true,true)),params(
         "tool",pe("文生视频","USER","文生视频","图生视频"),
         "prompt",p("textarea","",true,"USER"),"negative_prompt",p("textarea","",true,"USER"),
         "model",pe("video-free","USER","video-free","agnes-video-2.5-flash","agnes-video-v2.0","grok-imagine-video","grok-imagine-video-1.5"),

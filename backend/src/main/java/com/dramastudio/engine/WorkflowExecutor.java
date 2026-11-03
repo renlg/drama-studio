@@ -98,7 +98,13 @@ public class WorkflowExecutor {
         List<Asset> made=executeFfmpeg(run,nr,cfg,type,tool);
         succeed(nr);for(Asset a:made)events.emit(run.id,"ASSET_CREATED",Map.of("nodeId",id,"assetId",a.id,"episodeNumber",episode));return;
       }
-      String prompt=prompts.build(type,cfg,run.projectId);nr.renderedPrompt=prompt;
+      String prompt=prompts.build(type,cfg,run.projectId);
+      // 上游文本注入：TEXT 节点连到本节点 text 端口时，其产出文本作为 prompt（用户没手动填时）
+      String upstreamText=upstreamText(run.id,cfg);
+      if(!upstreamText.isBlank()&&String.valueOf(cfg.getOrDefault("prompt","")).isBlank()){
+        cfg.put("prompt",upstreamText);prompt=prompts.build(type,cfg,run.projectId);
+      }
+      nr.renderedPrompt=prompt;
       List<String> refs=referenceUrls(run,type,cfg);
       nodeRuns.save(nr);
       // 节点级供应商解析：把 baseUrl / apiKey 塞进 params，适配器优先用它们（缺失则回落全局 env）
@@ -203,6 +209,20 @@ public class WorkflowExecutor {
   @SuppressWarnings("unchecked") private List<Asset> inputAssets(String runId,Map<String,Object> cfg){
     Object raw=cfg.get("__input_node_ids");if(!(raw instanceof Map<?,?> ports))return List.of();Set<String> sourceIds=new LinkedHashSet<>();ports.values().forEach(v->{if(v instanceof Collection<?> c)c.forEach(x->sourceIds.add(String.valueOf(x)));else if(v!=null)sourceIds.add(String.valueOf(v));});
     List<Asset> out=new ArrayList<>();for(NodeRun source:nodeRuns.findByWorkflowRunIdOrderByCreatedAt(runId))if(sourceIds.contains(source.nodeId))out.addAll(assets.findByNodeRunIdOrderByCreatedAtDesc(source.id));Collections.reverse(out);return out;
+  }
+
+  /** 从 text 端口的上游 TEXT 节点取最新产出文本。 */
+  @SuppressWarnings("unchecked") private String upstreamText(String runId,Map<String,Object> cfg){
+    Object raw=cfg.get("__input_node_ids");if(!(raw instanceof Map<?,?> ports))return "";
+    Object textPort=ports.get("text");if(!(textPort instanceof Collection<?> c)||c.isEmpty())return "";
+    StringBuilder sb=new StringBuilder();
+    for(NodeRun source:nodeRuns.findByWorkflowRunIdOrderByCreatedAt(runId)){
+      if(!c.contains(source.nodeId)||source.nodeType==null||!"TEXT".equals(source.nodeType))continue;
+      for(Asset a:assets.findByNodeRunIdOrderByCreatedAtDesc(source.id)){
+        if(a.contentText!=null&&!a.contentText.isBlank()){sb.append(a.contentText).append("\n");break;}
+      }
+    }
+    return limit(sb.toString().trim(),2000);
   }
 
   private List<Asset> executeFfmpeg(WorkflowRun run,NodeRun nr,Map<String,Object> cfg,String type,String tool){
