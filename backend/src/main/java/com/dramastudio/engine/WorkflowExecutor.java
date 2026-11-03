@@ -105,7 +105,7 @@ public class WorkflowExecutor {
         cfg.put("prompt",upstreamText);prompt=prompts.build(type,cfg,run.projectId);
       }
       nr.renderedPrompt=prompt;
-      List<String> refs=referenceUrls(run,type,cfg);
+      List<String> refs=referenceUrls(run,id,type,cfg);
       nodeRuns.save(nr);
       // 节点级供应商解析：把 baseUrl / apiKey 塞进 params，适配器优先用它们（缺失则回落全局 env）
       String providerId=Objects.toString(cfg.get("providerId"),null);
@@ -202,8 +202,16 @@ public class WorkflowExecutor {
   private void validateMediaResult(Result result,String capability){if(!"SUCCEEDED".equalsIgnoreCase(result.status())||result.outputUrl()==null||result.outputUrl().isBlank())throw new ProviderException(ErrorCode.PROVIDER_TIMEOUT,capability+" 供应商未返回可用结果");}
   private int clampDuration(Object value){return Math.max(4,Math.min(12,intValue(value,5)));}
 
-  private List<String> referenceUrls(WorkflowRun run,String type,Map<String,Object> cfg){
-    List<Asset> input=inputAssets(run.id,cfg);if(!input.isEmpty())return input.stream().filter(a->a.storageKey!=null&&!a.storageKey.isBlank()).map(a->storage.presignGet(a.storageKey,java.time.Duration.ofHours(24))).toList();
+  private List<String> referenceUrls(WorkflowRun run,String nodeId,String type,Map<String,Object> cfg){
+    List<Asset> input=inputAssets(run.id,cfg);
+    // 图生视频：优先用本节点自己上传的图片当首帧
+    if("VIDEO".equals(type)&&"图生视频".equals(Objects.toString(cfg.get("tool"),""))&&input.isEmpty()){
+      List<Asset> uploaded=assets.findByProjectIdAndLogicalKeyAndDeletedAtIsNullOrderByVersionNoDesc(run.projectId,"node-upload:"+nodeId);
+      if(!uploaded.isEmpty()&&uploaded.get(0).storageKey!=null&&!uploaded.get(0).storageKey.isBlank()){
+        return List.of(storage.presignGet(uploaded.get(0).storageKey,java.time.Duration.ofHours(24)));
+      }
+    }
+    if(!input.isEmpty())return input.stream().filter(a->a.storageKey!=null&&!a.storageKey.isBlank()).map(a->storage.presignGet(a.storageKey,java.time.Duration.ofHours(24))).toList();
     return prompts.resolveReferenceImages(run.projectId,type,cfg);
   }
   @SuppressWarnings("unchecked") private List<Asset> inputAssets(String runId,Map<String,Object> cfg){
