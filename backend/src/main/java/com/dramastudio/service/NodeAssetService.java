@@ -55,7 +55,8 @@ public class NodeAssetService {
     if(old==null||better(asset,old))chosen.put(asset.logicalKey,asset);
    }
   }
-  for(Asset asset:assets.findByProjectIdAndLogicalKeyAndDeletedAtIsNullOrderByVersionNoDesc(projectId,"node-upload:"+nodeId)){
+  // 节点上传的资产（node-upload:{nodeId}:* 前缀匹配全部，多图不覆盖）
+  for(Asset asset:assets.findByProjectIdAndLogicalKeyStartsWithAndDeletedAtIsNullOrderByCreatedAtDesc(projectId,"node-upload:"+nodeId+":")){
    Asset old=chosen.get(asset.logicalKey);
    if(old==null||better(asset,old))chosen.put(asset.logicalKey,asset);
   }

@@ -23,7 +23,14 @@ function NodeMedia({nodeId,type}:{nodeId:string;type:string}){
   const list=data?.assets??[],images=list.filter(a=>isImageAsset(a.assetType)&&(a.thumbnailUrl||a.previewUrl)),videos=list.filter(a=>isVideoAsset(a.assetType)&&a.playUrl),firstImage=images[0],firstVideo=videos[0];
   const canUpload=canUploadNode(type),accept=uploadAccept(type,tool);
   const upload=async({file,onSuccess,onError}:UploadRequestOption)=>{try{const body=new FormData();body.append('file',file as File);body.append('assetType',assetTypeOfFile(file as File));await api.post(`/projects/${projectId}/nodes/${nodeId}/upload`,body);await reload();message.success('上传成功');onSuccess?.({})}catch(e){message.error('上传失败');onError?.(e as Error)}};
-  const media=firstImage?<div className="node-media-image"><Image src={firstImage.thumbnailUrl||firstImage.previewUrl} preview={{src:firstImage.previewUrl||firstImage.thumbnailUrl}} alt={firstImage.name}/>{images.length>1&&<span className="media-count">+{images.length-1}</span>}</div>:firstVideo?<button className="node-video-poster" onClick={()=>setVideoOpen(true)}><video muted playsInline preload="metadata" src={firstVideo.playUrl}/><span className="video-play">▶</span>{videos.length>1&&<span className="media-count">+{videos.length-1}</span>}</button>:null;
+  const media=images.length>0
+    ? <div className={`node-media-grid ${images.length===1?'node-media-single':''}`}>
+        {images.slice(0,4).map(a=>(
+          <div key={a.id} className="node-media-item"><Image src={a.thumbnailUrl||a.previewUrl} preview={{src:a.previewUrl||a.thumbnailUrl}} alt={a.name}/></div>
+        ))}
+        {images.length>4&&<span className="media-count">+{images.length-4}</span>}
+      </div>
+    : firstVideo?<button className="node-video-poster" onClick={()=>setVideoOpen(true)}><video muted playsInline preload="metadata" src={firstVideo.playUrl}/><span className="video-play">▶</span>{videos.length>1&&<span className="media-count">+{videos.length-1}</span>}</button>:null;
   return <div className="node-media-frame nodrag nowheel" onClick={e=>e.stopPropagation()}>
     {media}
     {!media&&canUpload&&<Upload accept={accept} showUploadList={false} customRequest={upload}><div className="node-media-empty">＋ 上传</div></Upload>}

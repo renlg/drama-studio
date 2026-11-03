@@ -23,7 +23,7 @@ public class NodeUploadService {
   String mime=Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
   String inferred=infer(mime);
   String type="GENERIC_OUTPUT".equals(inferred)&&requestedType!=null&&!requestedType.isBlank()?requestedType:inferred;
-  String logicalKey="node-upload:"+nodeId;
+  String logicalKey="node-upload:"+nodeId+":"+UUID.randomUUID().toString().substring(0,8);
   int version=assets.findFirstByProjectIdAndLogicalKeyOrderByVersionNoDesc(projectId,logicalKey).map(a->a.versionNo+1).orElse(1);
   String original=Optional.ofNullable(file.getOriginalFilename()).filter(x->!x.isBlank()).orElse("upload."+fallbackExt(mime));
   String ext=extension(original,mime), key=storage.objectKey(user,projectId,type,logicalKey,version,ext);

@@ -206,7 +206,7 @@ public class WorkflowExecutor {
     List<Asset> input=inputAssets(run.id,cfg);
     // 图生视频：优先用本节点自己上传的图片当首帧
     if("VIDEO".equals(type)&&"图生视频".equals(Objects.toString(cfg.get("tool"),""))&&input.isEmpty()){
-      List<Asset> uploaded=assets.findByProjectIdAndLogicalKeyAndDeletedAtIsNullOrderByVersionNoDesc(run.projectId,"node-upload:"+nodeId);
+      List<Asset> uploaded=assets.findByProjectIdAndLogicalKeyStartsWithAndDeletedAtIsNullOrderByCreatedAtDesc(run.projectId,"node-upload:"+nodeId+":");
       if(!uploaded.isEmpty()&&uploaded.get(0).storageKey!=null&&!uploaded.get(0).storageKey.isBlank()){
         return List.of(storage.presignGet(uploaded.get(0).storageKey,java.time.Duration.ofHours(24)));
       }
