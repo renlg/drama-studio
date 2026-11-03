@@ -2,7 +2,6 @@ import {useState} from 'react';
 import {Handle,Position,type NodeProps} from 'reactflow';
 import {Image,Modal,Progress,Tag,Upload,message} from 'antd';
 import type {UploadRequestOption} from 'rc-upload/lib/interface';
-import {useQueryClient} from '@tanstack/react-query';
 import {useParams} from 'react-router-dom';
 import {api} from '../api/client';
 import {useNodeAssets} from './NodeAssetsOutput';
@@ -17,13 +16,13 @@ const icon:Record<string,string>={TEXT:'📝',IMAGE:'🖼',VIDEO:'🎬',AUDIO:'�
 const statusColor:Record<NodeStatus,string>={PENDING:'default',QUEUED:'default',RUNNING:'processing',SUCCEEDED:'success',FAILED:'error',CANCELED:'default',BLOCKED:'warning',STALE:'warning'};
 const portLabels:Record<string,string>={text:'文本',refs:'参考素材',images:'图片',chars:'角色',scenes:'场景',audios:'音频',character:'角色',scene:'场景',video:'视频',input:'输入',output:'输出'};
 
-function PortHandles({ports,kind}:{ports:CatalogPort[];kind:'input'|'output'}){const position=kind==='input'?Position.Left:Position.Right,type=kind==='input'?'target' as const:'source' as const;return <>{ports.map((port,index)=>{const top=`${((index+1)/(ports.length+1))*100}%`;return <div className={`node-port node-port-${kind}`} style={{top}} key={port.name}><span className="node-port-label">{portLabels[port.name]??port.name}</span><Handle type={type} id={port.name} position={position}/></div>})}</>}
+function PortHandles({ports,kind}:{ports:CatalogPort[];kind:'input'|'output'}){const position=kind==='input'?Position.Left:Position.Right,type=kind==='input'?'target' as const:'source' as const;return <>{ports.map((port,index)=>{const top=`${((index+1)/(ports.length+1))*100}%`,side=kind==='input'?{left:0}:{right:0};return <div className={`node-port node-port-${kind} nodrag`} style={{position:'absolute',top}} key={port.name}><span className="node-port-label">{portLabels[port.name]??port.name}</span><Handle type={type} id={port.name} position={position} style={{position:'absolute',top:'50%',...side}}/></div>})}</>}
 
 function NodeMedia({nodeId,type}:{nodeId:string;type:string}){
-  const {projectId}=useParams(),queryClient=useQueryClient(),openGenerate=useWorkflow(x=>x.openGenerate),tool=useWorkflow(x=>String(x.nodes.find(n=>n.id===nodeId)?.data?.config?.tool??'')),{data,reload}=useNodeAssets(nodeId,false),[videoOpen,setVideoOpen]=useState(false);
+  const {projectId}=useParams(),openGenerate=useWorkflow(x=>x.openGenerate),tool=useWorkflow(x=>String(x.nodes.find(n=>n.id===nodeId)?.data?.config?.tool??'')),{data,reload}=useNodeAssets(nodeId,false),[videoOpen,setVideoOpen]=useState(false);
   const list=data?.assets??[],images=list.filter(a=>isImageAsset(a.assetType)&&(a.thumbnailUrl||a.previewUrl)),videos=list.filter(a=>isVideoAsset(a.assetType)&&a.playUrl),firstImage=images[0],firstVideo=videos[0];
   const canUpload=canUploadNode(type),accept=uploadAccept(type,tool);
-  const upload=async({file,onSuccess,onError}:UploadRequestOption)=>{try{const body=new FormData();body.append('file',file as File);body.append('assetType',assetTypeOfFile(file as File));await api.post(`/projects/${projectId}/nodes/${nodeId}/upload`,body);await queryClient.invalidateQueries({queryKey:['node-assets',projectId,nodeId]});await reload();message.success('上传成功');onSuccess?.({})}catch(e){message.error('上传失败');onError?.(e as Error)}};
+  const upload=async({file,onSuccess,onError}:UploadRequestOption)=>{try{const body=new FormData();body.append('file',file as File);body.append('assetType',assetTypeOfFile(file as File));await api.post(`/projects/${projectId}/nodes/${nodeId}/upload`,body);await reload();message.success('上传成功');onSuccess?.({})}catch(e){message.error('上传失败');onError?.(e as Error)}};
   const media=firstImage?<div className="node-media-image"><Image src={firstImage.thumbnailUrl||firstImage.previewUrl} preview={{src:firstImage.previewUrl||firstImage.thumbnailUrl}} alt={firstImage.name}/>{images.length>1&&<span className="media-count">+{images.length-1}</span>}</div>:firstVideo?<button className="node-video-poster" onClick={()=>setVideoOpen(true)}><video muted playsInline preload="metadata" src={firstVideo.playUrl}/><span className="video-play">▶</span>{videos.length>1&&<span className="media-count">+{videos.length-1}</span>}</button>:null;
   return <div className="node-media-frame nodrag nowheel" onClick={e=>e.stopPropagation()}>
     {media}
