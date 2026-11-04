@@ -25,6 +25,8 @@
 
 /* ===== 即梦式生成弹框（jm-*）===== */
 .jm-mask{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.62);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;animation:jm-fade .16s ease-out}
+/* 弹窗内 AntD 下拉必须高于遮罩层，否则选项被盖住点不到 */
+.ant-select-dropdown{z-index:1300!important}
 @keyframes jm-fade{from{opacity:0}to{opacity:1}}
 @keyframes jm-pop{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 .jm-modal{width:min(560px,100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;gap:14px;padding:18px 18px 16px;border-radius:18px;background:#1a1c21;border:1px solid rgba(255,255,255,.08);box-shadow:0 24px 64px rgba(0,0,0,.55);color:#fff;animation:jm-pop .18s ease-out;overflow:auto}
@@ -45,7 +47,7 @@
 .jm-upload-hint{font-size:11.5px;color:#5f6672}
 .jm-seg .ant-segmented{background:#22252b;border-radius:10px;padding:3px}
 .jm-seg .ant-segmented-item-selected{background:#7b9cff;color:#0d0e10;font-weight:600}
-.jm-row{display:flex;align-items:center;gap:10px}
+.jm-row{display:flex;align-items:center;gap:10px;position:relative}
 .jm-row-label{flex:0 0 32px;font-size:12.5px;color:#8f959f}
 .jm-provider{flex:0 0 132px}
 .jm-model{flex:1}

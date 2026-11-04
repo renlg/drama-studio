@@ -156,9 +156,11 @@ export default function NodeGenerateModal(){
    {showModelRow&&<div className="jm-row">
      <span className="jm-row-label">模型</span>
      <Select className="jm-provider" value={sel.provider?.id} options={providerOptions} placeholder="供应商"
-       onChange={v=>{setProviderId(String(v));setModelId(undefined)}} popupMatchSelectWidth={false}/>
+       onChange={v=>{setProviderId(String(v));setModelId(undefined)}} popupMatchSelectWidth={false}
+       getPopupContainer={t=>t.parentElement as HTMLElement}/>
      <Select className="jm-model" value={sel.model?.modelId} options={modelOptions} placeholder="选择模型"
-       onChange={v=>setModelId(String(v))} popupMatchSelectWidth={false}/>
+       onChange={v=>setModelId(String(v))} popupMatchSelectWidth={false}
+       getPopupContainer={t=>t.parentElement as HTMLElement}/>
     </div>}
 
    {showRatio&&<div className="jm-row">
